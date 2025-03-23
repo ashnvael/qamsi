@@ -13,7 +13,6 @@
 from typing import Optional, Union
 
 # Third party imports
-import pandas as pd
 import numpy as np
 import qpsolvers
 import scipy.sparse as spa
