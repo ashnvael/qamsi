@@ -20,24 +20,28 @@ class BaseCovEstimator(ABC):
         # )
         pass
 
-    def fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
-        self._fit(features, targets)
+    def fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
+        self._fit(features, factors, targets)
         self._fitted = True
 
-    def predict(self, features: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
         assert self._fitted, "Model is not fitted yet! Call fit() first."
 
-        pred_cov = self._predict(features)
+        pred_cov = self._predict(features, factors)
         self._check_positive_semi_definite(pred_cov)
         return pred_cov
 
-    def __call__(self, features: pd.DataFrame) -> pd.DataFrame:
-        return self.predict(features)
+    def __call__(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
+        return self.predict(features, factors)
 
     @abstractmethod
-    def _fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def _predict(self, features: pd.DataFrame) -> pd.DataFrame:
+    def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError

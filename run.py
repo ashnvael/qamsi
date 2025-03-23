@@ -13,7 +13,6 @@ from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.cov_estimators.cov_estimators import CovEstimators
-from qamsi.strategies.heuristics.equally_weighted import EWStrategy
 from qamsi.features.preprocessor import Preprocessor
 
 HEDGE = False
@@ -52,13 +51,18 @@ def run_backtest(
 
     # Handles the features
     preprocessor = Preprocessor(exclude_names=[*list(stocks), "acc_rate", "spx"])
+    prices = [stock + "_Price" for stock in list(stocks)]
+    preprocessor = Preprocessor(feature_names=prices)
 
     strategy = MinVariance(
         cov_estimator=cov_estimator,
         trading_config=trading_config,
     )
 
-    baseline_strategy = EWStrategy()
+    baseline_strategy = MinVariance(
+        cov_estimator=CovEstimators.HISTORICAL.value(),
+        trading_config=trading_config,
+    )
 
     run_result = runner.train(
         feature_processor=preprocessor,
