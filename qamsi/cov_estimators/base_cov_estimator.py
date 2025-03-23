@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pandas as pd
 
-import numpy as np
-
 
 class BaseCovEstimator(ABC):
     def __init__(self) -> None:

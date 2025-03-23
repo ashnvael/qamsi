@@ -75,7 +75,7 @@ class Constraints:
                     lower = upper * 0
             else:
                 if not np.isscalar(lower):
-                    if any(l < 0 for l in lower):
+                    if any(lb < 0 for lb in lower):
                         raise ValueError(
                             "Inconsistent lower bounds for box_type 'LongOnly'. "
                             "Change box_type to LongShort or ensure that lower >= 0."
@@ -164,7 +164,7 @@ class Constraints:
                 h = np.array(self.budget["rhs"], dtype=float)
 
         if lbub_to_G:
-            I = np.eye(len(self.selection))
+            I = np.eye(len(self.selection))  # noqa: E741
             G_tmp = np.concatenate((-I, I), axis=0)
             h_tmp = np.concatenate((-self.box["lower"], self.box["upper"]), axis=0)
             G = np.vstack((G, G_tmp)) if (G is not None) else G_tmp
@@ -188,8 +188,8 @@ class Constraints:
                 A = np.vstack((A, A_tmp)) if A is not None else A_tmp
                 b = np.concatenate((b, b_tmp), axis=None) if b is not None else b_tmp
                 if idx_eq.sum() < Gmat.shape[0]:
-                    G_tmp = Gmat[idx_eq == False].to_numpy()
-                    h_tmp = rhs[idx_eq == False].to_numpy()
+                    G_tmp = Gmat[idx_eq == False].to_numpy()  # noqa: E712
+                    h_tmp = rhs[idx_eq == False].to_numpy()  # noqa: E712
             else:
                 G_tmp = Gmat.to_numpy()
                 h_tmp = rhs.to_numpy()

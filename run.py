@@ -19,9 +19,15 @@ from qamsi.features.preprocessor import Preprocessor
 HEDGE = False
 
 
-def run_backtest(cov_estimator: BaseCovEstimator, verbose: bool = False, plot_progress: bool = False) -> RunResult:
+def run_backtest(
+    cov_estimator: BaseCovEstimator, verbose: bool = False, plot_progress: bool = False
+) -> RunResult:
     experiment_config = ExperimentConfig()
-    stocks = tuple(pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME).columns)
+    stocks = tuple(
+        pd.read_csv(
+            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
+        ).columns
+    )
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
 
     experiment_config.N_LOOKBEHIND_PERIODS = 252

@@ -9,7 +9,9 @@ import pandas as pd
 @dataclass
 class ExperimentConfig:
     # Strategy Settings
-    FRACTIONAL_DIFFERENCING: float = field(default=0.5, metadata={"docs": "Fractional Difference Order"})
+    FRACTIONAL_DIFFERENCING: float = field(
+        default=0.5, metadata={"docs": "Fractional Difference Order"}
+    )
 
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
@@ -35,15 +37,28 @@ class ExperimentConfig:
     )
 
     # Filenames
-    INITIAL_DF_FILENAME: str = field(default="initial_features_df.csv", metadata={"docs": "Initial preprocessed data"})
+    INITIAL_DF_FILENAME: str = field(
+        default="initial_features_df.csv",
+        metadata={"docs": "Initial preprocessed data"},
+    )
 
-    STOCKS_LIST_FILENAME: str = field(default="stocks_list.csv", metadata={"docs": "Stocks list"})
+    STOCKS_LIST_FILENAME: str = field(
+        default="stocks_list.csv", metadata={"docs": "Stocks list"}
+    )
 
-    INITIAL_FEATURES_FILENAME: str = field(default="initial_features_df.csv", metadata={"docs": "Initial preprocessed features"})
+    INITIAL_FEATURES_FILENAME: str = field(
+        default="initial_features_df.csv",
+        metadata={"docs": "Initial preprocessed features"},
+    )
 
-    PRICES_DF_FILENAME: str = field(default="prices_df.csv", metadata={"docs": "Preprocessed price data"})
+    PRICES_DF_FILENAME: str = field(
+        default="prices_df.csv", metadata={"docs": "Preprocessed price data"}
+    )
 
-    DF_FILENAME: str = field(default="data_df.csv", metadata={"docs": "Preprocessed data (after experiments)"})
+    DF_FILENAME: str = field(
+        default="data_df.csv",
+        metadata={"docs": "Preprocessed data (after experiments)"},
+    )
 
     RETURNS_FILENAME: str = field(
         default="returns_data_cleaned_better.parquet",
@@ -78,7 +93,9 @@ class ExperimentConfig:
 
     N_LOOKBEHIND_PERIODS: int = field(
         default=252,
-        metadata={"docs": "Number of rebalance periods to take into rolling regression"},
+        metadata={
+            "docs": "Number of rebalance periods to take into rolling regression"
+        },
     )
 
     MIN_ROLLING_PERIODS: int = field(
