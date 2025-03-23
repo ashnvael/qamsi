@@ -24,13 +24,17 @@ def run_backtest(cov_estimator: BaseCovEstimator, verbose: bool = False, plot_pr
     stocks = tuple(pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME).columns)
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
 
+    experiment_config.TRAIN_START_DATE = pd.Timestamp("2020-01-01")
+
     experiment_config.N_LOOKBEHIND_PERIODS = 252
     experiment_config.REBALANCE_FREQ_DAYS = 1
 
     trading_config = TradingConfig(
         broker_fee=0.05 / 100,
         bid_ask_spread=0.03 / 100,  # Taken as average bid-ask spread
+        max_exposure=0.5,
         min_exposure=0,
+        total_exposure=1,
     )
 
     runner = Runner(
@@ -47,6 +51,7 @@ def run_backtest(cov_estimator: BaseCovEstimator, verbose: bool = False, plot_pr
 
     strategy = MinVariance(
         cov_estimator=cov_estimator,
+        trading_config=trading_config,
     )
 
     baseline_strategy = EWStrategy()
@@ -68,9 +73,15 @@ def run_backtest(cov_estimator: BaseCovEstimator, verbose: bool = False, plot_pr
 
 
 if __name__ == "__main__":
-    estimator = CovEstimators.HISTORICAL.value()
+    ESTIMATOR = CovEstimators.HISTORICAL.value()
+    VERBOSE = True
+    PLOT_PROGRESS = False
 
-    run_result = run_backtest(estimator)
+    run_result = run_backtest(
+        cov_estimator=ESTIMATOR,
+        verbose=VERBOSE,
+        plot_progress=PLOT_PROGRESS,
+    )
 
     print(run_result.strategy)
 

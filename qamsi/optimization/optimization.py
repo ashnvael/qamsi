@@ -175,29 +175,9 @@ class VarianceMinimizer(Optimization):
     def set_objective(self, covmat: pd.DataFrame) -> None:
         self.objective = Objective(
             P=covmat,
+            q=np.zeros(covmat.shape[0]),
         )
         return None
 
     def solve(self) -> None:
-        if all(constr is None for constr in self.constraints.linear.values()):
-            GhAb = self.constraints.to_GhAb()
-            obj_coeff = self.objective.coefficients
-
-            Sigma = obj_coeff["P"]
-            A = GhAb["A"]
-            b = GhAb["b"]
-
-            if b.ndim == 0:
-                b = b.reshape(-1, 1)
-
-            inner_matrix_inv = np.linalg.inv(A @ np.linalg.inv(Sigma) @ A.T)
-            weights = np.linalg.inv(Sigma) @ A.T @ inner_matrix_inv @ b
-            weights = list(weights.flatten())
-
-            self.results.update(
-                {"weights": dict(zip(self.asset_names, weights)), "status": True}
-            )
-
-            return None
-        else:
-            return super().solve()
+        return super().solve()

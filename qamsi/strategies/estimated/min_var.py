@@ -4,6 +4,7 @@ from typing import Callable, Optional
 
 import pandas as pd
 
+from config.trading_config import TradingConfig
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.optimization.constraints import Constraints
 from qamsi.optimization.optimization import VarianceMinimizer
@@ -14,7 +15,7 @@ class MinVariance(BaseStrategy):
     def __init__(
         self,
         cov_estimator: BaseCovEstimator,
-        max_exposure: float = 1.0,
+        trading_config: TradingConfig,
         random_seed: int | None = None,
         ml_metrics: Optional[list[Callable]] = None,
     ) -> None:
@@ -24,7 +25,7 @@ class MinVariance(BaseStrategy):
         )
 
         self.cov_estimator = cov_estimator
-        self.max_exposure = max_exposure
+        self.trading_config = trading_config
 
     def _fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
         available_hist_stocks = set(
@@ -34,15 +35,21 @@ class MinVariance(BaseStrategy):
 
         self.cov_estimator.fit(features, targets[self.available_assets])
 
-    def _optimize(self, covmat: pd.DataFrame) -> dict[str, float]:
+    def _optimize(self, covmat: pd.DataFrame) -> pd.Series[float]:
         constraints = Constraints(ids=self.available_assets)
-        constraints.add_budget(rhs=self.max_exposure, sense="=")
+
+        constraints.add_box(
+            lower=self.trading_config.min_exposure,
+            upper=self.trading_config.max_exposure,
+        )
+        constraints.add_budget(rhs=self.trading_config.total_exposure, sense="=")
+
         self.var_min = VarianceMinimizer(constraints=constraints)
 
         self.var_min.set_objective(covmat=covmat)
         self.var_min.solve()
 
-        return self.var_min.results["weights"]
+        return pd.Series(self.var_min.results["weights"])
 
     def get_weights(self, features: pd.DataFrame) -> pd.DataFrame:
         covmat = self.cov_estimator.predict(features)
@@ -51,7 +58,7 @@ class MinVariance(BaseStrategy):
         weights_df = pd.DataFrame(
             0.0, index=[features.index[-1]], columns=self.all_assets
         )
-        weights_df.loc[:, self.available_assets] = weights
+        weights_df.loc[:, weights.index] = weights.to_numpy()
 
         # (!!!) Please, use only excess returns to apply this scaling correctly
         return weights_df

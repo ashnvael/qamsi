@@ -6,8 +6,9 @@ from dataclasses import dataclass
 @dataclass
 class TradingConfig:
     # Exposures
-    max_exposure: float = 1.0
+    max_exposure: float = 0.1
     min_exposure: float = 0.0
+    total_exposure: float = 1.0
 
     # Broker Fees
     broker_fee: float = 0.0

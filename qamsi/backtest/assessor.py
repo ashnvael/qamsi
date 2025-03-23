@@ -177,8 +177,8 @@ class Assessor:
             final_rf=final_rf,
             mean=strat_mean,
             std=strat_std,
-            skew=strat_skew.astype(float),  # type: ignore  # noqa: PGH003
-            kurtosis=strat_kurtosis.astype(float),  # type: ignore  # noqa: PGH003
+            skew=strat_skew,  # type: ignore  # noqa: PGH003
+            kurtosis=strat_kurtosis,  # type: ignore  # noqa: PGH003
             sharpe=sr_strategy_total,
             max_dd=strategy_max_dd,
             alpha_buy_hold=buy_hold_alpha,
