@@ -19,7 +19,7 @@ from qamsi.features.preprocessor import Preprocessor
 HEDGE = False
 
 
-def run_backtest(cov_estimator: BaseCovEstimator) -> RunResult:
+def run_backtest(cov_estimator: BaseCovEstimator, verbose: bool = False, plot_progress: bool = False) -> RunResult:
     experiment_config = ExperimentConfig()
     stocks = tuple(pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME).columns)
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
@@ -36,7 +36,8 @@ def run_backtest(cov_estimator: BaseCovEstimator) -> RunResult:
     runner = Runner(
         experiment_config=experiment_config,
         trading_config=trading_config,
-        verbose=True,
+        verbose=verbose,
+        plot=plot_progress,
     )
 
     hedger = MarketFuturesHedge()

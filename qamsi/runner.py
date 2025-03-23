@@ -40,12 +40,14 @@ class Runner:
         trading_config: TradingConfig,
         ml_metrics: list[Callable] | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
+        plot: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.experiment_config = experiment_config
         self.trading_config = trading_config
 
         self.ml_metrics = ml_metrics
         self.verbose = verbose
+        self.plot = plot
 
         self.tc_charger = TransactionCostCharger(
             trading_config=self.trading_config,
@@ -126,6 +128,7 @@ class Runner:
             min_rolling_periods=self.experiment_config.MIN_ROLLING_PERIODS,
             rebal_freq_days=self.experiment_config.REBALANCE_FREQ_DAYS,
             verbose=self.verbose,
+            plot=self.plot,
             hedging_assets=hedging_assets.truncate(feature_processor.truncation_len)
             if hedging_assets is not None
             else hedging_assets,

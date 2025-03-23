@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 
 class Backtester:
@@ -29,6 +30,7 @@ class Backtester:
         min_rolling_periods: int | None = 12,
         rebal_freq_days: int = 20,
         verbose: bool = False,  # noqa: FBT001, FBT002
+        plot: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         super().__init__()
 
@@ -44,6 +46,7 @@ class Backtester:
         )
         self.rebal_freq_days = rebal_freq_days
         self.verbose = verbose
+        self.plot = plot
 
         self._stocks_total_r = None
         self._stocks_excess_r = None
@@ -79,7 +82,12 @@ class Backtester:
         )
         last_rebal_date = None
 
-        for i, iter_tuple in enumerate(self._rolling_tuples):
+        if self.verbose and not self.plot:
+            print("Running backtest...")
+            self._rolling_tuples = tqdm(self._rolling_tuples)
+
+        i = 0
+        for iter_tuple in self._rolling_tuples:
             (
                 rolling_features,
                 rolling_simple_r,
@@ -181,7 +189,7 @@ class Backtester:
                     .tolist()[0]
                 )
 
-                if self.verbose and i != 0 and i % 20 == 0:
+                if self.plot and i != 0 and i % 20 == 0:
                     self._plot_progress(
                         dates=np.array(rolling_stocks_xs_r)[:, 0].tolist(),
                         rolling_weights=np.array(rolling_weights)[:-1, 1:],
@@ -195,6 +203,7 @@ class Backtester:
 
                 previous_weights = weights
                 last_rebal_date = current_date
+                i += 1
 
         rolling_weights = rolling_weights[:-1]
         rolling_turnover = rolling_turnover[:-1]
