@@ -51,9 +51,10 @@ def run_backtest(
     hedger = MarketFuturesHedge()
 
     # Handles the features
-    preprocessor = Preprocessor(exclude_names=[*list(stocks), "acc_rate", "spx"])
     prices = [stock + "_Price" for stock in list(stocks)]
-    preprocessor = Preprocessor(feature_names=prices)
+    preprocessor = Preprocessor(
+        exclude_names=[*prices, *list(stocks), "acc_rate", "spx"]
+    )
 
     strategy = MinVariance(
         cov_estimator=cov_estimator,

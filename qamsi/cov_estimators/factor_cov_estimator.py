@@ -51,7 +51,11 @@ class FactorCovEstimator(BaseCovEstimator):
         self.residual_cov_estimator.fit(features, factors, self._residuals)
 
     def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
-        factor_cov = self.factor_cov_estimator.predict(features, factors).to_numpy()
+        factor_cov = (
+            self.factor_cov_estimator.predict(features, factors)
+            .to_numpy()
+            .astype(float)
+        )
         residual_cov = self.residual_cov_estimator.predict(features, factors).to_numpy()
 
         residual_cov = np.diag(np.diag(residual_cov))
