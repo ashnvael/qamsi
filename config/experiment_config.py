@@ -120,7 +120,7 @@ class ExperimentConfig:
     )
 
     FACTORS: tuple[str] = field(
-        default=("low_risk", "momentum", "quality", "size", "value"),
+        default=("low_risk", "momentum", "quality", "size", "value", "spx"),
         metadata={"docs": "Tradeable factors tuple"},
     )
 
