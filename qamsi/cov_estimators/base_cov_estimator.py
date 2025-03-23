@@ -20,7 +20,9 @@ class BaseCovEstimator(ABC):
         # )
         pass
 
-    def fit(self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         self._fit(features, factors, targets)
         self._fitted = True
 
@@ -35,7 +37,9 @@ class BaseCovEstimator(ABC):
         return self.predict(features, factors)
 
     @abstractmethod
-    def _fit(self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
