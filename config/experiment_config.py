@@ -17,17 +17,22 @@ class ExperimentConfig:
 
     # Folders
     PATH_FEATURES: Path = field(
-        default=Path(__file__).resolve().parents[4] / "data" / "gw",
+        default=Path(__file__).resolve().parents[1] / "data" / "gw",
         metadata={"docs": "Relative path to data folder"},
     )
 
     PATH_MARKET_DATA: Path = field(
-        default=Path(__file__).resolve().parents[2] / "data" / "spx_stocks",
+        default=Path(__file__).resolve().parents[1] / "data" / "spx_stocks",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
+    PATH_FACTOR_DATA: Path = field(
+        default=Path(__file__).resolve().parents[1] / "data" / "factors",
         metadata={"docs": "Relative path to data folder"},
     )
 
     PATH_BETTER_MARKET_DATA: Path = field(
-        default=Path(__file__).resolve().parents[0] / "data" / "spxc",
+        default=Path(__file__).resolve().parents[1] / "data" / "spxc",
         metadata={"docs": "Relative path to data folder"},
     )
 
@@ -63,6 +68,11 @@ class ExperimentConfig:
     RETURNS_FILENAME: str = field(
         default="returns_data_cleaned_better.parquet",
         metadata={"docs": "Returns With Dividends"},
+    )
+
+    FACTORS_FILENAME: str = field(
+        default="factors.csv",
+        metadata={"docs": "Factor portfolios"},
     )
 
     # Experiment Settings
@@ -110,7 +120,7 @@ class ExperimentConfig:
     )
 
     FACTORS: tuple[str] = field(
-        default=("spx",),
+        default=("low_risk", "momentum", "quality", "size", "value"),
         metadata={"docs": "Tradeable factors tuple"},
     )
 

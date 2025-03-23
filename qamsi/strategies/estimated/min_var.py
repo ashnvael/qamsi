@@ -27,7 +27,9 @@ class MinVariance(BaseStrategy):
         self.cov_estimator = cov_estimator
         self.trading_config = trading_config
 
-    def _fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         available_hist_stocks = set(
             targets.loc[:, ~targets.isna().any()].columns.tolist()
         )
@@ -51,7 +53,9 @@ class MinVariance(BaseStrategy):
 
         return pd.Series(self.var_min.results["weights"])
 
-    def get_weights(self, features: pd.DataFrame) -> pd.DataFrame:
+    def get_weights(
+        self, features: pd.DataFrame, factors: pd.DataFrame
+    ) -> pd.DataFrame:
         covmat = self.cov_estimator.predict(features)
         weights = self._optimize(covmat)
 

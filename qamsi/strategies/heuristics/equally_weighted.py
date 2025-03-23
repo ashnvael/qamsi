@@ -16,10 +16,14 @@ class EWStrategy(BaseStrategy):
         self.all_assets = None
         self.available_assets = None
 
-    def _fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         pass
 
-    def get_weights(self, features: pd.DataFrame) -> pd.DataFrame:
+    def get_weights(
+        self, features: pd.DataFrame, factors: pd.DataFrame
+    ) -> pd.DataFrame:
         n_assets = len(self.available_assets)
         weights = pd.DataFrame(0.0, index=[features.index[-1]], columns=self.all_assets)
         weights.loc[:, self.available_assets] = (

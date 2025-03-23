@@ -29,7 +29,7 @@ class BaseStrategy(ABC):
         self.all_assets = None
         self.available_assets = None
 
-    def __call__(self, features: pd.DataFrame) -> pd.DataFrame:
+    def __call__(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
         """Invoke the strategy to compute portfolio weights based on input features.
 
         Args:
@@ -40,25 +40,32 @@ class BaseStrategy(ABC):
             pd.DataFrame: A DataFrame of computed portfolio weights.
 
         """
-        return self.get_weights(features=features)
+        return self.get_weights(features=features, factors=factors)
 
-    def fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         available_stocks = targets.loc[:, ~targets.iloc[-1].isna()].columns.tolist()
         self.all_assets = targets.columns.tolist()
         self.available_assets = targets[available_stocks].columns.tolist()
 
-        self._fit(features=features, targets=targets[available_stocks])
+        self._fit(features=features, factors=factors, targets=targets[available_stocks])
 
     @abstractmethod
-    def _fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def get_weights(self, features: pd.DataFrame) -> pd.DataFrame:
+    def get_weights(
+        self, features: pd.DataFrame, factors: pd.DataFrame
+    ) -> pd.DataFrame:
         """Calculate the portfolio weights based on the input features.
 
         Args:
             features (pd.DataFrame): A DataFrame containing the input feature variables.
+            factors (pd.DataFrame): A DataFrame containing the input factor variables.
 
         Returns:
             pd.DataFrame: A DataFrame containing the calculated portfolio weights.
