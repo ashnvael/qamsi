@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from qamsi.backtest.assessor import Assessor, StrategyStatistics
 from qamsi.backtest.backtester import Backtester
 from qamsi.backtest.plot import (
@@ -293,3 +294,26 @@ class Runner:
             end_date = self.strategy_total_r.index.max()
 
         plot_turnover(self.strategy_turnover.loc[start_date:end_date])
+
+    def plot_outperformance(
+        self,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None,
+    ):
+        strategy_total_r = self.strategy_total_r.loc[start_date:end_date]
+        baseline_total_r = self.baseline_total_r.loc[start_date:end_date]
+        dates = strategy_total_r.index
+
+        strategy_total_r = strategy_total_r.to_numpy().flatten()
+        baseline_total_r = baseline_total_r.to_numpy().flatten()
+
+        outperform = strategy_total_r - baseline_total_r
+        outperform_rel = outperform / (1 + baseline_total_r)
+
+        plt.figure(figsize=(14, 8))
+        plt.plot(dates, np.log(1 + outperform_rel).cumsum())
+
+        plt.xlabel("Date")
+        plt.ylabel("Outperformance")
+
+        plt.show()

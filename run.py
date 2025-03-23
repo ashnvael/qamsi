@@ -28,9 +28,10 @@ def run_backtest(
         ).columns
     )
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
+    experiment_config.FACTORS = ("spx",)
 
     experiment_config.N_LOOKBEHIND_PERIODS = 252
-    experiment_config.REBALANCE_FREQ_DAYS = 5
+    experiment_config.REBALANCE_FREQ_DAYS = 20
 
     trading_config = TradingConfig(
         broker_fee=0.05 / 100,
@@ -50,9 +51,10 @@ def run_backtest(
     hedger = MarketFuturesHedge()
 
     # Handles the features
-    preprocessor = Preprocessor(exclude_names=[*list(stocks), "acc_rate", "spx"])
     prices = [stock + "_Price" for stock in list(stocks)]
-    preprocessor = Preprocessor(feature_names=prices)
+    preprocessor = Preprocessor(
+        exclude_names=[*prices, *list(stocks), "acc_rate", "spx"]
+    )
 
     strategy = MinVariance(
         cov_estimator=cov_estimator,
@@ -76,6 +78,8 @@ def run_backtest(
     runner.plot_turnover()
 
     runner.plot_returns_histogram_vs_baseline()
+
+    runner.plot_outperformance()
 
     return run_result
 
