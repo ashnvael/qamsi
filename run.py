@@ -24,8 +24,6 @@ def run_backtest(cov_estimator: BaseCovEstimator, verbose: bool = False, plot_pr
     stocks = tuple(pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME).columns)
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
 
-    experiment_config.TRAIN_START_DATE = pd.Timestamp("2020-01-01")
-
     experiment_config.N_LOOKBEHIND_PERIODS = 252
     experiment_config.REBALANCE_FREQ_DAYS = 1
 
