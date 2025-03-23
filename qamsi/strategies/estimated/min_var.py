@@ -35,7 +35,11 @@ class MinVariance(BaseStrategy):
         )
         self.available_assets = list(set(self.available_assets) & available_hist_stocks)
 
-        self.cov_estimator.fit(features, targets[self.available_assets])
+        self.cov_estimator.fit(
+            features=features,
+            factors=factors,
+            targets=targets[self.available_assets],
+        )
 
     def _optimize(self, covmat: pd.DataFrame) -> pd.Series[float]:
         constraints = Constraints(ids=self.available_assets)
@@ -56,7 +60,7 @@ class MinVariance(BaseStrategy):
     def get_weights(
         self, features: pd.DataFrame, factors: pd.DataFrame
     ) -> pd.DataFrame:
-        covmat = self.cov_estimator.predict(features)
+        covmat = self.cov_estimator.predict(features, factors)
         weights = self._optimize(covmat)
 
         weights_df = pd.DataFrame(

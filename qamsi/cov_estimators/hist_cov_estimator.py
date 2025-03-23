@@ -14,8 +14,8 @@ class HistoricalCovEstimator(BaseCovEstimator):
 
         self._fitted_cov = None
 
-    def _fit(self, features: pd.DataFrame, targets: pd.DataFrame) -> None:
+    def _fit(self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame) -> None:
         self._fitted_cov = targets.cov()
 
-    def _predict(self, features: pd.DataFrame) -> pd.DataFrame:
+    def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
         return self._fitted_cov
