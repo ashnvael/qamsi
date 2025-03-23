@@ -43,12 +43,13 @@ def plot_cumulative_pnls(
 
     if buy_hold is not None:
         buy_hold_cumulative = buy_hold.add(1).cumprod()
-        buy_hold = (
-            np.log(buy_hold_cumulative.to_numpy())
-            if plot_log
-            else buy_hold_cumulative.to_numpy()
-        )
-        plt.plot(buy_hold_cumulative.index, buy_hold, label="100% Buy & Hold")
+        for col in buy_hold.columns:
+            buy_hold_series = (
+                np.log(buy_hold_cumulative[col].to_numpy())
+                if plot_log
+                else buy_hold_cumulative[col].to_numpy()
+            )
+            plt.plot(buy_hold_cumulative.index, buy_hold_series, label=col)
 
     plt.xlabel("Date", fontsize=14)
     if plot_log:

@@ -31,7 +31,7 @@ def run_backtest(
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
 
     experiment_config.N_LOOKBEHIND_PERIODS = 252
-    experiment_config.REBALANCE_FREQ_DAYS = 1
+    experiment_config.REBALANCE_FREQ_DAYS = 5
 
     trading_config = TradingConfig(
         broker_fee=0.05 / 100,

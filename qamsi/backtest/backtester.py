@@ -110,6 +110,15 @@ class Backtester:
                 train_features = rolling_features.iloc[:-1]
                 pred_features = (rolling_features.iloc[-1]).to_frame().T
 
+                train_factors = (
+                    rolling_hedge_log_r.iloc[:-1] - rolling_rf.iloc[:-1].to_numpy()
+                )
+                pred_factors = (
+                    (rolling_hedge_log_r.iloc[-1] - rolling_rf.iloc[-1].to_numpy())
+                    .to_frame()
+                    .T
+                )
+
                 train_xs_r = rolling_log_r.iloc[:-1] - rolling_rf.iloc[:-1].to_numpy()
 
                 if last_rebal_date is not None:
@@ -138,7 +147,6 @@ class Backtester:
                         .to_numpy()
                     )
                     agg_hedge_xs_r = agg_hedge_total_r - agg_rf
-                    # print(np.sqrt(agg_hedge_xs_r ** 2 * 252))
 
                     rolling_stocks_total_r.append(
                         [current_date, *agg_stocks_total_r.tolist()]
@@ -151,12 +159,10 @@ class Backtester:
 
                 # Whether the strategy has a memory or retrains from scratch is handled inside the strategy obj
                 # Still pass all targets, not only tradeable, as can provide info for the strategy
-                strategy.fit(features=train_features, targets=train_xs_r)
-                weights = strategy(pred_features)
-
-                # up_restrict_ratio = np.max(weights.sum() / self.trading_config.max_exposure, 1)
-                # down_restrict_ratio = np.min(self.trading_config.min_exposure / weights.sum(), 1)
-                # weights = weights * 1 / up_restrict_ratio
+                strategy.fit(
+                    features=train_features, factors=train_factors, targets=train_xs_r
+                )
+                weights = strategy(features=pred_features, factors=pred_factors)
 
                 weights = np.minimum(weights, self.trading_config.max_exposure)
                 weights = np.maximum(weights, self.trading_config.min_exposure)
