@@ -58,8 +58,6 @@ class FactorCovEstimator(BaseCovEstimator):
         )
         residual_cov = self.residual_cov_estimator.predict(features, factors).to_numpy()
 
-        residual_cov = np.diag(np.diag(residual_cov))
-
         exposures = self._factor_exposures.to_numpy()
 
         return exposures @ factor_cov @ exposures.T + residual_cov

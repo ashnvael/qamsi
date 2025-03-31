@@ -19,7 +19,10 @@ HEDGE = False
 
 
 def run_backtest(
-    cov_estimator: BaseCovEstimator, verbose: bool = False, plot_progress: bool = False
+    cov_estimator: BaseCovEstimator,
+    rebalance_mode: str,
+    verbose: bool = False,
+    plot_progress: bool = False,
 ) -> RunResult:
     experiment_config = ExperimentConfig()
     stocks = tuple(
@@ -30,7 +33,7 @@ def run_backtest(
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
     experiment_config.FACTORS = ("spx",)
 
-    experiment_config.N_LOOKBEHIND_PERIODS = 252
+    experiment_config.N_LOOKBEHIND_PERIODS = 3 * 252
     experiment_config.REBALANCE_FREQ_DAYS = 20
 
     trading_config = TradingConfig(
@@ -59,11 +62,13 @@ def run_backtest(
     strategy = MinVariance(
         cov_estimator=cov_estimator,
         trading_config=trading_config,
+        rebalance_mode=rebalance_mode,
     )
 
     baseline_strategy = MinVariance(
         cov_estimator=CovEstimators.HISTORICAL.value(),
         trading_config=trading_config,
+        rebalance_mode=rebalance_mode,
     )
 
     run_result = runner.train(
@@ -86,11 +91,13 @@ def run_backtest(
 
 if __name__ == "__main__":
     ESTIMATOR = CovEstimators.HISTORICAL.value()
+    REBALANCE_MODE = "fully"
     VERBOSE = True
     PLOT_PROGRESS = False
 
     run_result = run_backtest(
         cov_estimator=ESTIMATOR,
+        rebalance_mode=REBALANCE_MODE,
         verbose=VERBOSE,
         plot_progress=PLOT_PROGRESS,
     )

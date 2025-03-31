@@ -6,12 +6,8 @@ from qamsi.strategies.base_strategy import BaseStrategy
 
 
 class EWStrategy(BaseStrategy):
-    def __init__(
-        self, rebal_freq: str | None = None, random_seed: int | None = None
-    ) -> None:
-        super().__init__()
-        self.rebal_freq = rebal_freq
-        self.random_seed = random_seed
+    def __init__(self, rebalance_mode: str = "fully") -> None:
+        super().__init__(rebalance_mode=rebalance_mode)
 
         self.all_assets = None
         self.available_assets = None
@@ -21,7 +17,7 @@ class EWStrategy(BaseStrategy):
     ) -> None:
         pass
 
-    def get_weights(
+    def _get_weights(
         self, features: pd.DataFrame, factors: pd.DataFrame
     ) -> pd.DataFrame:
         n_assets = len(self.available_assets)
