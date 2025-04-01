@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
-
 import pandas as pd
 
 from config.trading_config import TradingConfig
@@ -16,13 +14,9 @@ class MinVariance(BaseStrategy):
         self,
         cov_estimator: BaseCovEstimator,
         trading_config: TradingConfig,
-        random_seed: int | None = None,
-        ml_metrics: Optional[list[Callable]] = None,
+        rebalance_mode: str = "fully",
     ) -> None:
-        super().__init__(
-            random_seed=random_seed,
-            ml_metrics=ml_metrics,
-        )
+        super().__init__(rebalance_mode=rebalance_mode)
 
         self.cov_estimator = cov_estimator
         self.trading_config = trading_config
@@ -57,7 +51,7 @@ class MinVariance(BaseStrategy):
 
         return pd.Series(self.var_min.results["weights"])
 
-    def get_weights(
+    def _get_weights(
         self, features: pd.DataFrame, factors: pd.DataFrame
     ) -> pd.DataFrame:
         covmat = self.cov_estimator.predict(features, factors)

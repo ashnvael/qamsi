@@ -300,6 +300,12 @@ class Runner:
         start_date: pd.Timestamp | None = None,
         end_date: pd.Timestamp | None = None,
     ):
+        if start_date is None:
+            start_date = self.strategy_total_r.index.min()
+
+        if end_date is None:
+            end_date = self.strategy_total_r.index.max()
+
         strategy_total_r = self.strategy_total_r.loc[start_date:end_date]
         baseline_total_r = self.baseline_total_r.loc[start_date:end_date]
         dates = strategy_total_r.index

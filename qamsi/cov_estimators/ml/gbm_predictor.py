@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 
 
@@ -11,20 +12,41 @@ class GBMPredictor(BaseCovEstimator):
         super().__init__()
 
         self._models = {}
+        self._obs_means = {}
+
+        self._available_assets = None
+        self._obs_corr = None
+        self._obs_cov = None
 
     def _fit(
         self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
     ) -> None:
-        for stock in targets.columns:
-            self._models[stock] = GradientBoostingRegressor(
-                n_estimators=30, max_depth=5, random_state=12
+        self._available_assets = list(targets.columns)
+        self._obs_corr = targets.corr().to_numpy()
+        self._obs_cov = targets.cov()
+        for stock in self._available_assets:
+            self._models[stock] = RandomForestRegressor(
+                n_estimators=30, min_samples_leaf=5, random_state=12
             )
             self._models[stock].fit(features, targets[stock] ** 2)
+            self._obs_means[stock] = targets[stock].mean()
 
     def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
-        stocks = list(self._models.keys())
-        covmat = pd.DataFrame(index=stocks, columns=stocks)
-        for stock in stocks:
-            covmat.loc[stock, stock] = self._models[stock].predict(features)
+        available_assets = self._available_assets
+        vols = []
+        for stock in available_assets:
+            vols.append(self._models[stock].predict(features).item() - self._obs_means[stock] ** 2)
 
-        return covmat.clip(lower=0)
+        vols = np.eye(len(vols)) * np.sqrt(np.array(vols))
+        cov = self.var_covar_from_corr_array(self._obs_corr, vols)
+        covmat = pd.DataFrame(cov, index=available_assets, columns=available_assets)
+
+        return covmat.astype(float)
+
+    @staticmethod
+    def var_covar_from_corr_array(
+            corr_array: np.ndarray, volatilities: np.ndarray = None
+    ) -> np.ndarray:
+        if volatilities is None:
+            volatilities = np.ones_like(corr_array)
+        return volatilities @ corr_array @ volatilities

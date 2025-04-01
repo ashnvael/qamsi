@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable, Optional
     import pandas as pd
+
+from abc import ABC, abstractmethod
+from enum import Enum
+
+import numpy as np
+
+
+class RebalanceMode(Enum):
+    FULLY = "fully"
+    ONLY_CHANGED = "only_changed"
 
 
 class BaseStrategy(ABC):
@@ -17,17 +25,14 @@ class BaseStrategy(ABC):
 
     """
 
-    def __init__(
-        self,
-        random_seed: int | None = None,
-        ml_metrics: Optional[list[Callable]] = None,
-    ) -> None:
+    def __init__(self, rebalance_mode: str = "fully") -> None:
         super().__init__()
-        self.random_seed = random_seed
-        self.ml_metrics = ml_metrics
+        self.rebalance_mode = RebalanceMode(rebalance_mode)
 
         self.all_assets = None
         self.available_assets = None
+
+        self._past_weights = None
 
     def __call__(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
         """Invoke the strategy to compute portfolio weights based on input features.
@@ -51,6 +56,47 @@ class BaseStrategy(ABC):
 
         self._fit(features=features, factors=factors, targets=targets[available_stocks])
 
+    def get_weights(
+        self, features: pd.DataFrame, factors: pd.DataFrame
+    ) -> pd.DataFrame:
+        weights = self._get_weights(features=features, factors=factors)
+
+        if self.rebalance_mode == RebalanceMode.FULLY:
+            pass
+        elif self.rebalance_mode == RebalanceMode.ONLY_CHANGED:
+            assert (weights.to_numpy() >= 0).all(), (
+                f"Weights must be non-negative for the method {self.rebalance_mode}."
+            )  # noqa: S101
+            if self._past_weights is not None:
+                new_weights = weights.to_numpy().flatten()
+                past_weights = self._past_weights.to_numpy().flatten()
+                proposed_change = new_weights - past_weights
+
+                were_zero_mask = np.where(past_weights == 0, 1, 0)
+                will_be_non_zero = np.where(new_weights != 0, 1, 0)
+
+                were_non_zero_mask = np.where(past_weights != 0, 1, 0)
+                want_set_zero_mask = np.where(new_weights == 0, 1, 0)
+
+                accept_change = (were_zero_mask & will_be_non_zero) | (
+                    were_non_zero_mask & want_set_zero_mask
+                )
+
+                adj_weights = past_weights + proposed_change * accept_change
+                adj_weights = adj_weights / adj_weights.sum()
+            else:
+                adj_weights = weights.to_numpy().flatten()
+
+            weights = pd.DataFrame(
+                adj_weights[np.newaxis, :], index=weights.index, columns=weights.columns
+            )
+        else:
+            msg = f"RebalanceMode {self.rebalance_mode} not implemented."
+            raise NotImplementedError(msg)
+
+        self._past_weights = weights
+        return weights
+
     @abstractmethod
     def _fit(
         self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
@@ -58,7 +104,7 @@ class BaseStrategy(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_weights(
+    def _get_weights(
         self, features: pd.DataFrame, factors: pd.DataFrame
     ) -> pd.DataFrame:
         """Calculate the portfolio weights based on the input features.
