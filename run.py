@@ -31,9 +31,11 @@ def run_backtest(
         ).columns
     )
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
-    experiment_config.FACTORS = ("spx",)
+    # experiment_config.FACTORS = ("spx",)
 
-    experiment_config.N_LOOKBEHIND_PERIODS = 3 * 252
+    # experiment_config.TRAIN_START_DATE = pd.Timestamp("2019-06-30")
+
+    experiment_config.N_LOOKBEHIND_PERIODS = 252
     experiment_config.REBALANCE_FREQ_DAYS = 20
 
     trading_config = TradingConfig(
@@ -56,7 +58,7 @@ def run_backtest(
     # Handles the features
     prices = [stock + "_Price" for stock in list(stocks)]
     preprocessor = Preprocessor(
-        exclude_names=[*prices, *list(stocks), "acc_rate", "spx"]
+        exclude_names=[*prices, *list(stocks)]
     )
 
     strategy = MinVariance(
@@ -77,6 +79,8 @@ def run_backtest(
         baseline_strategy=baseline_strategy,
         hedger=hedger if HEDGE else None,
     )
+
+    runner.plot_cumulative()
 
     runner.plot_cumulative(include_factors=True)
 

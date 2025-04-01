@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import pandas as pd
 
 import numpy as np
+import pandas as pd
 from qamsi.cov_estimators.hist_cov_estimator import HistoricalCovEstimator
 
 
@@ -16,5 +13,5 @@ class DiagHistoricalCovEstimator(HistoricalCovEstimator):
         self._fitted_cov = None
 
     def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
-        cov = super().predict(features, factors)
+        cov = super()._predict(features, factors)
         return pd.DataFrame(np.diag(np.diag(cov)))

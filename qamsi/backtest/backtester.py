@@ -122,29 +122,15 @@ class Backtester:
                 train_xs_r = rolling_log_r.iloc[:-1] - rolling_rf.iloc[:-1].to_numpy()
 
                 if last_rebal_date is not None:
-                    agg_stocks_total_r = rolling_simple_r.loc[
-                        last_rebal_date:current_date
-                    ]
+                    start_date = last_rebal_date + pd.Timedelta(days=1)
+                    agg_stocks_total_r = rolling_simple_r.loc[start_date:current_date]
                     agg_stocks_total_r = agg_stocks_total_r.fillna(0)
-                    agg_stocks_total_r = (
-                        agg_stocks_total_r.add(1).prod(axis=0).add(-1).to_numpy()
-                    )
+                    agg_stocks_total_r = agg_stocks_total_r.add(1).prod(axis=0).add(-1).to_numpy()
 
-                    agg_rf = (
-                        rolling_rf.loc[last_rebal_date:current_date]
-                        .add(1)
-                        .prod()
-                        .add(-1)
-                        .to_numpy()
-                        .item()
-                    )
+                    agg_rf = rolling_rf.loc[start_date:current_date].add(1).prod().add(-1).to_numpy().item()
                     agg_stocks_xs_r = agg_stocks_total_r - agg_rf
                     agg_hedge_total_r = (
-                        rolling_hedge_simple_r.loc[last_rebal_date:current_date]
-                        .add(1)
-                        .prod(axis=0)
-                        .add(-1)
-                        .to_numpy()
+                        rolling_hedge_simple_r.loc[start_date:current_date].add(1).prod(axis=0).add(-1).to_numpy()
                     )
                     agg_hedge_xs_r = agg_hedge_total_r - agg_rf
 
