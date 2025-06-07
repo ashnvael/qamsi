@@ -7,6 +7,7 @@ from qamsi.cov_estimators.ml.factor_predictor import FactorPredictor
 from qamsi.cov_estimators.diag_hist_cov_estimator import DiagHistoricalCovEstimator
 from qamsi.cov_estimators.shrinkage.pca_cov_estimator import PCACovEstimator
 from qamsi.cov_estimators.shrinkage.qis import QISCovEstimator
+from qamsi.cov_estimators.factor_cov_estimator2 import FactorCovEstimator as FactorCovEstimator2
 
 
 class CovEstimators(Enum):
@@ -19,3 +20,5 @@ class CovEstimators(Enum):
 
     FACTOR_PREDICTOR = FactorPredictor
     GBM_PREDICTOR = GBMPredictor
+
+    NIKOLAI_COV = FactorCovEstimator2
