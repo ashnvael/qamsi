@@ -9,6 +9,7 @@ from qamsi.cov_estimators.shrinkage.diag_hist_cov_estimator import (
 from qamsi.cov_estimators.shrinkage.pca_cov_estimator import PCACovEstimator
 from qamsi.cov_estimators.shrinkage.qis import QISCovEstimator
 from qamsi.cov_estimators.shrinkage.rp_cov_estimator import RiskfolioCovEstimator
+from qamsi.cov_estimators.ml.glasso_estimator import GLassoCovEstimator
 
 
 class CovEstimators(Enum):
@@ -22,3 +23,5 @@ class CovEstimators(Enum):
     QIS = QISCovEstimator
 
     SKLEARN_ML_PREDICTOR = SklearnMlPredictor
+
+    GLASSO = GLassoCovEstimator
