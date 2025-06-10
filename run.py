@@ -98,7 +98,7 @@ def run_backtest() -> StrategyStatistics:
     strategy_name = ESTIMATOR.__class__.__name__
 
     if SAVE:
-        runner.save(DATASET.name + strategy_name + f"_rebal{REBAL_FREQ}")
+        runner.save(f"{DATASET.name}_" + strategy_name + f"_rebal{REBAL_FREQ}")
 
     runner.plot_cumulative(
         strategy_name=strategy_name,
