@@ -14,24 +14,31 @@ class FactorCovEstimator(BaseCovEstimator):
         self,
         factor_cov_estimator: BaseCovEstimator,
         residual_cov_estimator: BaseCovEstimator,
+        factors_selection: list[str] | None = None,
     ) -> None:
         super().__init__()
 
         self.factor_cov_estimator = factor_cov_estimator
         self.residual_cov_estimator = residual_cov_estimator
+        self.factors_selection = factors_selection
 
         self._factor_exposures = None
         self._residuals = None
 
     def _fit(self, training_data: TrainingData) -> None:
+        factors = training_data.factors
+
+        if self.factors_selection is not None:
+            factors = factors[self.factors_selection]
+
         self._factor_exposures, self._residuals = get_exposures(
-            factors=training_data.factors,
+            factors=factors,
             targets=training_data.simple_excess_returns,
             return_residuals=True,
         )
 
         factor_train_data = deepcopy(training_data)
-        factor_train_data.simple_excess_returns = training_data.factors
+        factor_train_data.simple_excess_returns = factors
         factor_train_data.targets = None
         factor_train_data.log_excess_returns = None
 
@@ -55,4 +62,9 @@ class FactorCovEstimator(BaseCovEstimator):
 
         exposures = self._factor_exposures.to_numpy()
 
-        return exposures @ factor_cov @ exposures.T + residual_cov
+        covmat = exposures @ factor_cov @ exposures.T + residual_cov
+        covmat = pd.DataFrame(
+            covmat, index=self._available_assets, columns=self._available_assets
+        )
+
+        return covmat.astype(float)

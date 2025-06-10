@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 
 from qamsi.strategies.optimization_data import TrainingData, PredictionData
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
-from qamsi.features.covar import var_covar_from_corr_array
+from qamsi.features.covar import var_covar_from_corr_array_mac
 
 
 class PCACovEstimator(BaseCovEstimator):
@@ -40,7 +40,7 @@ class PCACovEstimator(BaseCovEstimator):
         self._fitted_corr = reconstr_corr.clip(min=-1, max=1)
         np.fill_diagonal(self._fitted_corr, 1)
 
-        cov = var_covar_from_corr_array(self._fitted_corr, self._fitted_vols)
+        cov = var_covar_from_corr_array_mac(self._fitted_corr, self._fitted_vols)
         self._fitted_cov = pd.DataFrame(
             cov, index=self.available_assets, columns=self.available_assets
         )

@@ -14,5 +14,5 @@ class DiagHistoricalCovEstimator(HistoricalCovEstimator):
         self._fitted_cov = None
 
     def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
-        cov = self._predict(prediction_data=prediction_data)
+        cov = super()._predict(prediction_data=prediction_data)
         return pd.DataFrame(np.diag(np.diag(cov)))

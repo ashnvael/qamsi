@@ -23,8 +23,9 @@ REBAL_FREQ = "ME"
 DATASET = Dataset.SPX_US
 
 ESTIMATION_WINDOW = 365 * 3
-ESTIMATOR = CovEstimators.RISKFOLIO.value(
-    estimator_type="shrunk",
+ESTIMATOR = CovEstimators.STATIC_FACTOR_MODEL.value(
+    factor_cov_estimator=CovEstimators.HISTORICAL.value(),
+    residual_cov_estimator=CovEstimators.DIAG_HISTORICAL.value(),
 )
 
 SAVE = True
