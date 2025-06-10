@@ -9,7 +9,11 @@ from qamsi.features.base_preprocessor import BasePreprocessor
 
 
 class Preprocessor(BasePreprocessor):
-    def __init__(self, feature_names: list[str] | None = None, exclude_names: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        feature_names: list[str] | None = None,
+        exclude_names: list[str] | None = None,
+    ) -> None:
         super().__init__()
 
         self.feature_names = feature_names

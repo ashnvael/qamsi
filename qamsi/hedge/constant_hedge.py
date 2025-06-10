@@ -12,7 +12,9 @@ from qamsi.hedge.base_hedger import BaseHedger
 
 
 class ConstantHedge(BaseHedger):
-    def __init__(self, constant_weight: float | np.array, market_name: str = "MKT") -> None:
+    def __init__(
+        self, constant_weight: float | np.array, market_name: str = "MKT"
+    ) -> None:
         super().__init__(market_name=market_name)
 
         self.constant_weight = constant_weight

@@ -22,7 +22,9 @@ class BaseExperimentConfig:
     )
 
     # Filename
-    DF_FILENAME: str = field(default="data_df.csv", metadata={"docs": "Preprocessed data"})
+    DF_FILENAME: str = field(
+        default="data_df.csv", metadata={"docs": "Preprocessed data"}
+    )
 
     # Experiment Settings
     START_DATE: pd.Timestamp | None = field(
@@ -52,7 +54,9 @@ class BaseExperimentConfig:
 
     N_LOOKBEHIND_PERIODS: int | None = field(
         default=None,
-        metadata={"docs": "Number of rebalance periods to take into rolling regression"},
+        metadata={
+            "docs": "Number of rebalance periods to take into rolling regression"
+        },
     )
 
     MIN_ROLLING_PERIODS: int = field(

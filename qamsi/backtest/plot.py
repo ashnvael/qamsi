@@ -38,7 +38,12 @@ def plot_cumulative_pnls(
             market = buy_hold_cumulative[mkt_name]
             buy_hold_cumulative = buy_hold_cumulative.drop(columns=mkt_name)
             plt.plot(market.index, market.to_numpy(), label=mkt_name, linewidth=6)
-        plt.plot(buy_hold_cumulative.index, buy_hold_cumulative.to_numpy(), label=buy_hold_cumulative.columns, linestyle="--")
+        plt.plot(
+            buy_hold_cumulative.index,
+            buy_hold_cumulative.to_numpy(),
+            label=buy_hold_cumulative.columns,
+            linestyle="--",
+        )
         plt.legend(
             fontsize=16,
             loc="upper left",

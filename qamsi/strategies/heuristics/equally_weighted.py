@@ -19,7 +19,11 @@ class EWStrategy(BaseStrategy):
     def _fit(self, training_data: TrainingData) -> None:
         pass
 
-    def _get_weights(self, prediction_data: PredictionData, weights_: pd.DataFrame) -> pd.DataFrame:  # noqa: ARG002
+    def _get_weights(
+        self, prediction_data: PredictionData, weights_: pd.DataFrame
+    ) -> pd.DataFrame:  # noqa: ARG002
         n_assets = len(self.available_assets)
-        weights_.loc[:, self.available_assets] = np.ones((1, n_assets), dtype=float) / n_assets
+        weights_.loc[:, self.available_assets] = (
+            np.ones((1, n_assets), dtype=float) / n_assets
+        )
         return weights_

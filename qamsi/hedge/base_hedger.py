@@ -18,8 +18,12 @@ class BaseHedger(ABC):
 
         self.hedge_assets = None
 
-    def __call__(self, prediction_data: PredictionData, asset_weights: pd.DataFrame) -> pd.DataFrame:
-        return self.get_weights(prediction_data=prediction_data, asset_weights=asset_weights)
+    def __call__(
+        self, prediction_data: PredictionData, asset_weights: pd.DataFrame
+    ) -> pd.DataFrame:
+        return self.get_weights(
+            prediction_data=prediction_data, asset_weights=asset_weights
+        )
 
     def fit(self, training_data: TrainingData, hedge_assets: pd.DataFrame) -> None:
         self.hedge_assets = hedge_assets.columns.tolist()
@@ -30,9 +34,13 @@ class BaseHedger(ABC):
     def _fit(self, training_data: TrainingData, hedge_assets: pd.DataFrame) -> None:
         raise NotImplementedError
 
-    def get_weights(self, prediction_data: PredictionData, asset_weights: pd.DataFrame) -> pd.DataFrame:
+    def get_weights(
+        self, prediction_data: PredictionData, asset_weights: pd.DataFrame
+    ) -> pd.DataFrame:
         rebal_date = prediction_data.features.index[-1]
-        init_weights = pd.DataFrame(0.0, index=[rebal_date], columns=self.hedge_assets, dtype=np.float64)
+        init_weights = pd.DataFrame(
+            0.0, index=[rebal_date], columns=self.hedge_assets, dtype=np.float64
+        )
         return self._get_weights(
             prediction_data=prediction_data,
             asset_weights=asset_weights,

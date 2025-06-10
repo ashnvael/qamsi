@@ -22,16 +22,27 @@ class Dataset(Enum):
 REBAL_FREQ = "ME"
 DATASET = Dataset.SPX_US
 
-ESTIMATION_WINDOW = 365 * 5
-ESTIMATOR = CovEstimators.RISKFOLIO.value()
+ESTIMATION_WINDOW = 365 * 3
+ESTIMATOR = CovEstimators.RISKFOLIO.value(
+    estimator_type="shrunk",
+)
 
 SAVE = True
 
+
 def run_backtest() -> StrategyStatistics:
+    print("Running backtest...")
+    print(f"Estimation window: {ESTIMATION_WINDOW}")
+
     experiment_config = DATASET.value()
 
     stocks = tuple(
-        pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME).iloc[:, 0].astype(str).tolist(),
+        pd.read_csv(
+            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
+        )
+        .iloc[:, 0]
+        .astype(str)
+        .tolist(),
     )
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
 
@@ -47,7 +58,13 @@ def run_backtest() -> StrategyStatistics:
 
     prices = [stock + "_Price" for stock in list(stocks)]
     preprocessor = Preprocessor(
-        exclude_names=[*list(stocks), experiment_config.RF_NAME, *experiment_config.HEDGING_ASSETS, *factor_names, *prices],
+        exclude_names=[
+            *list(stocks),
+            experiment_config.RF_NAME,
+            *experiment_config.HEDGING_ASSETS,
+            *factor_names,
+            *prices,
+        ],
     )
 
     trading_config = TradingConfig(

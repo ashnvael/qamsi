@@ -28,17 +28,27 @@ class BaseStrategy(ABC):
     def fit(self, training_data: TrainingData) -> None:
         simple_xs_r = training_data.simple_excess_returns
 
-        available_stocks = simple_xs_r.loc[:, ~simple_xs_r.iloc[-1].isna()].columns.tolist()
+        available_stocks = simple_xs_r.loc[
+            :, ~simple_xs_r.iloc[-1].isna()
+        ].columns.tolist()
         self.all_assets = simple_xs_r.columns.tolist()
         self.available_assets = simple_xs_r[available_stocks].columns.tolist()
 
         training_data.simple_excess_returns = (
-            training_data.simple_excess_returns[available_stocks] if training_data.simple_excess_returns is not None else None
+            training_data.simple_excess_returns[available_stocks]
+            if training_data.simple_excess_returns is not None
+            else None
         )
         training_data.log_excess_returns = (
-            training_data.log_excess_returns[available_stocks] if training_data.log_excess_returns is not None else None
+            training_data.log_excess_returns[available_stocks]
+            if training_data.log_excess_returns is not None
+            else None
         )
-        training_data.targets = training_data.targets[available_stocks] if training_data.targets is not None else None
+        training_data.targets = (
+            training_data.targets[available_stocks]
+            if training_data.targets is not None
+            else None
+        )
 
         self._fit(training_data=training_data)
 
@@ -49,10 +59,14 @@ class BaseStrategy(ABC):
     def get_weights(self, prediction_data: PredictionData) -> pd.DataFrame:
         rebal_date = prediction_data.features.index[-1]
         init_weights = pd.DataFrame(0.0, index=[rebal_date], columns=self.all_assets)
-        return self._get_weights(prediction_data=prediction_data, weights_=init_weights.copy())
+        return self._get_weights(
+            prediction_data=prediction_data, weights_=init_weights.copy()
+        )
 
     @abstractmethod
-    def _get_weights(self, prediction_data: PredictionData, weights_: pd.DataFrame) -> pd.DataFrame:
+    def _get_weights(
+        self, prediction_data: PredictionData, weights_: pd.DataFrame
+    ) -> pd.DataFrame:
         raise NotImplementedError
 
     def __call__(self, prediction_data: PredictionData) -> pd.DataFrame:

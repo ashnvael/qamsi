@@ -14,13 +14,18 @@ from qamsi.features.covar import var_covar_from_corr_array
 
 @dataclass
 class SklearnParams:
-    #TODO(@V): Add typing
+    # TODO(@V): Add typing
     scaler = StandardScaler()
     random_state: int | None = None
 
 
 class SklearnMlPredictor(BaseCovEstimator):
-    def __init__(self, sklearn_model: BaseEstimator, sklearn_params: SklearnParams, resample_freq: str = "ME") -> None:
+    def __init__(
+        self,
+        sklearn_model: BaseEstimator,
+        sklearn_params: SklearnParams,
+        resample_freq: str = "ME",
+    ) -> None:
         super().__init__()
 
         self.sklearn_model = sklearn_model

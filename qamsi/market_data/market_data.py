@@ -56,7 +56,9 @@ class MarketData:
         self._create_returns_dfs()
 
     def _load_yahoo(self) -> None:
-        self.data = yfin.download(self.tickers.codes, self.start, self.end)[self.TARGET_COLUMN]
+        self.data = yfin.download(self.tickers.codes, self.start, self.end)[
+            self.TARGET_COLUMN
+        ]
         if self.data is None:
             msg = "Failed to load data from Yahoo Finance"
             raise ValueError(msg)
@@ -64,9 +66,13 @@ class MarketData:
             for i, ticker in enumerate(self.tickers.codes):
                 if i < self.data.shape[1]:
                     if self.data.columns[i] != ticker:
-                        self.data.insert(i, column=f"{ticker}_2", value=self.data.loc[:, ticker])
+                        self.data.insert(
+                            i, column=f"{ticker}_2", value=self.data.loc[:, ticker]
+                        )
                 else:
-                    self.data.insert(i, column=f"{ticker}_2", value=self.data.loc[:, ticker])
+                    self.data.insert(
+                        i, column=f"{ticker}_2", value=self.data.loc[:, ticker]
+                    )
 
     def _resample_data(self) -> None:
         if self.data is None:
@@ -132,7 +138,9 @@ class MarketData:
 
             vals = x.get_yticks()
             for tick in vals:
-                x.axhline(y=tick, linestyle="dashed", alpha=0.4, color="#eeeeee", zorder=1)
+                x.axhline(
+                    y=tick, linestyle="dashed", alpha=0.4, color="#eeeeee", zorder=1
+                )
 
             start_year = self.start.year if self.start else "Unknown"
             end_year = self.end.year if self.end else "Unknown"
@@ -163,7 +171,12 @@ class MarketData:
 
     @cache  # noqa: B019
     def get_dividends(self) -> np.ndarray:  # type: ignore[type-arg]
-        return np.array([yfin.Ticker(ticker).dividends.iloc[-1] / 100 for ticker in self.tickers.codes])
+        return np.array(
+            [
+                yfin.Ticker(ticker).dividends.iloc[-1] / 100
+                for ticker in self.tickers.codes
+            ]
+        )
 
     def __repr__(self) -> str:
         s = "Underlyings:\n"

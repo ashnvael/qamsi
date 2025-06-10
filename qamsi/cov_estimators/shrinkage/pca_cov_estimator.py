@@ -32,16 +32,18 @@ class PCACovEstimator(BaseCovEstimator):
         self._pca.fit(corr)
 
         components = self._pca.components_
-        components = components[:self.k, :]
+        components = components[: self.k, :]
 
-        reduced_data = self._pca.transform(corr)[:, :self.k]
+        reduced_data = self._pca.transform(corr)[:, : self.k]
 
         reconstr_corr = reduced_data @ components + self._pca.mean_
         self._fitted_corr = reconstr_corr.clip(min=-1, max=1)
         np.fill_diagonal(self._fitted_corr, 1)
 
         cov = var_covar_from_corr_array(self._fitted_corr, self._fitted_vols)
-        self._fitted_cov = pd.DataFrame(cov, index=self.available_assets, columns=self.available_assets)
+        self._fitted_cov = pd.DataFrame(
+            cov, index=self.available_assets, columns=self.available_assets
+        )
 
     def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
         return self._fitted_cov

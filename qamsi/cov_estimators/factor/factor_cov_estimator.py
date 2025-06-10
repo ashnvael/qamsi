@@ -45,11 +45,13 @@ class FactorCovEstimator(BaseCovEstimator):
 
     def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
         factor_cov = (
-            self.factor_cov_estimator.predict(prediction_data)
+            self.factor_cov_estimator.predict(prediction_data).to_numpy().astype(float)
+        )
+        residual_cov = (
+            self.residual_cov_estimator.predict(prediction_data)
             .to_numpy()
             .astype(float)
         )
-        residual_cov = self.residual_cov_estimator.predict(prediction_data).to_numpy().astype(float)
 
         exposures = self._factor_exposures.to_numpy()
 

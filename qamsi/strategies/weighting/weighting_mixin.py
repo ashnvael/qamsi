@@ -56,14 +56,18 @@ class WeightingMixin:
         raise NotImplementedError(msg)
 
     @staticmethod
-    def equal_weights(weights_: pd.DataFrame, selection: list[str], direction: int) -> pd.DataFrame:
+    def equal_weights(
+        weights_: pd.DataFrame, selection: list[str], direction: int
+    ) -> pd.DataFrame:
         if len(selection) == 0:
             return weights_
         weights_.loc[:, selection] = direction * 1 / len(selection)
         return weights_
 
     @staticmethod
-    def cap_weights(data: TrainingData, weights_: pd.DataFrame, selection: list[str], direction: int) -> pd.DataFrame:
+    def cap_weights(
+        data: TrainingData, weights_: pd.DataFrame, selection: list[str], direction: int
+    ) -> pd.DataFrame:
         if len(selection) == 0:
             return weights_
 

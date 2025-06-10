@@ -68,9 +68,15 @@ class Assessor:
         self.factor_annual = factor_annual
 
     @staticmethod
-    def _get_benchmark(strategy_excess: pd.Series, factors: pd.DataFrame | None) -> tuple[Any, Any, Callable[[], Any]]:
+    def _get_benchmark(
+        strategy_excess: pd.Series, factors: pd.DataFrame | None
+    ) -> tuple[Any, Any, Callable[[], Any]]:
         y = strategy_excess
-        features = factors if factors is not None else pd.DataFrame(index=strategy_excess.index)
+        features = (
+            factors
+            if factors is not None
+            else pd.DataFrame(index=strategy_excess.index)
+        )
 
         features = sm.add_constant(features)
 
@@ -81,10 +87,16 @@ class Assessor:
         return benchmark_excess_r, lr.params.iloc[1:], lr.pvalues
 
     @staticmethod
-    def _get_timing_ability(strategy_excess: pd.Series, factors: pd.DataFrame | None) -> tuple[float, float]:
+    def _get_timing_ability(
+        strategy_excess: pd.Series, factors: pd.DataFrame | None
+    ) -> tuple[float, float]:
         y = strategy_excess
 
-        features = factors if factors is not None else pd.DataFrame(index=strategy_excess.index)
+        features = (
+            factors
+            if factors is not None
+            else pd.DataFrame(index=strategy_excess.index)
+        )
 
         # Treynor-Mazuy procedure
         features_timing = pd.Series(np.maximum(features, 0))
@@ -102,7 +114,9 @@ class Assessor:
         return ((total_nav - prev_peak) / prev_peak).min()
 
     @staticmethod
-    def _get_sharpe_ratio_pvalue(strategy_total_r: pd.Series, baseline_total_r: pd.Series) -> float:
+    def _get_sharpe_ratio_pvalue(
+        strategy_total_r: pd.Series, baseline_total_r: pd.Series
+    ) -> float:
         raise NotImplementedError
 
     def _run(self, strategy_total: pd.Series) -> StrategyStatistics:
@@ -142,23 +156,33 @@ class Assessor:
         sr_strategy_total = strat_excess_mean / strat_std
 
         buy_hold_alpha = strat_mean - buy_hold_mean
-        buy_hold_tracking_error = np.std(strategy_excess - buy_hold_excess) * np.sqrt(factor_annual)
+        buy_hold_tracking_error = np.std(strategy_excess - buy_hold_excess) * np.sqrt(
+            factor_annual
+        )
         buy_hold_ir = buy_hold_alpha / buy_hold_tracking_error
 
-        benchmark_excess, loadings, pvalues = self._get_benchmark(strategy_excess, self.factors)
+        benchmark_excess, loadings, pvalues = self._get_benchmark(
+            strategy_excess, self.factors
+        )
         benchmark_total = benchmark_excess.add(self.rf_rate, axis=0)
         final_benchmark = benchmark_total.add(1).prod()
         benchmark_mean = final_benchmark ** (1 / n_periods) - 1
 
         benchmark_alpha = strat_mean - benchmark_mean
-        benchmark_tracking_error = np.std(strategy_excess - benchmark_excess) * np.sqrt(factor_annual)
+        benchmark_tracking_error = np.std(strategy_excess - benchmark_excess) * np.sqrt(
+            factor_annual
+        )
         benchmark_ir = benchmark_alpha / benchmark_tracking_error
         alpha_benchmark_pvalue = pvalues.iloc[0]  # type: ignore  # noqa: PGH003
 
-        ttest_pval = ttest_ind(strategy_excess, buy_hold_excess, alternative="greater").pvalue
+        ttest_pval = ttest_ind(
+            strategy_excess, buy_hold_excess, alternative="greater"
+        ).pvalue
         levene_pval = levene(strategy_excess, buy_hold_excess).pvalue
 
-        timing_ability_coef, timing_ability_pval = self._get_timing_ability(strategy_excess, buy_hold_excess)
+        timing_ability_coef, timing_ability_pval = self._get_timing_ability(
+            strategy_excess, buy_hold_excess
+        )
 
         # TODO(@V): 3 autocorrelation lags
 

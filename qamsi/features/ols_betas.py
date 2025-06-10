@@ -5,9 +5,15 @@ import pandas as pd
 import statsmodels.api as sm
 
 
-def prepare_data(risk_premia: pd.DataFrame, excess_r: pd.Series) -> tuple[pd.Series, pd.DataFrame]:
+def prepare_data(
+    risk_premia: pd.DataFrame, excess_r: pd.Series
+) -> tuple[pd.Series, pd.DataFrame]:
     data = pd.merge_asof(
-        risk_premia, excess_r, left_index=True, right_index=True, tolerance=pd.Timedelta("1D")
+        risk_premia,
+        excess_r,
+        left_index=True,
+        right_index=True,
+        tolerance=pd.Timedelta("1D"),
     )
     data = data.dropna(axis=0, how="any")
 
@@ -18,7 +24,9 @@ def prepare_data(risk_premia: pd.DataFrame, excess_r: pd.Series) -> tuple[pd.Ser
     return y, x
 
 
-def get_exposures(factors: pd.DataFrame, targets: pd.DataFrame, return_residuals: bool = False) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
+def get_exposures(
+    factors: pd.DataFrame, targets: pd.DataFrame, return_residuals: bool = False
+) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     # TODO(@V): Speedup by vectorizing regressions as tensors
 
     betas = pd.DataFrame(index=targets.columns, columns=factors.columns)
@@ -78,8 +86,14 @@ def get_betas(market_index: pd.Series, targets: pd.DataFrame) -> pd.Series:
     return betas.iloc[:, 0]
 
 
-def get_window_betas(market_index: pd.Series, targets: pd.DataFrame, window_days: int | None) -> pd.Series:
-    first_date = targets.index[-1] - pd.Timedelta(days=window_days) if window_days is not None else None
+def get_window_betas(
+    market_index: pd.Series, targets: pd.DataFrame, window_days: int | None
+) -> pd.Series:
+    first_date = (
+        targets.index[-1] - pd.Timedelta(days=window_days)
+        if window_days is not None
+        else None
+    )
 
     return get_betas(
         market_index=market_index.loc[first_date:],

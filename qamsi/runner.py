@@ -11,8 +11,6 @@ if TYPE_CHECKING:
     from qamsi.hedge.base_hedger import BaseHedger
     from qamsi.strategies.base_strategy import BaseStrategy
 
-from enum import Enum
-
 import pandas as pd
 
 from qamsi.backtest.assessor import Assessor, StrategyStatistics
@@ -50,11 +48,15 @@ class Runner:
         self._is_hedged = None
 
     def _prepare(self) -> None:
-        data_df = pd.read_csv(self.experiment_config.PATH_OUTPUT / self.experiment_config.DF_FILENAME)
+        data_df = pd.read_csv(
+            self.experiment_config.PATH_OUTPUT / self.experiment_config.DF_FILENAME
+        )
         data_df["date"] = pd.to_datetime(data_df["date"])
         data_df = data_df.set_index("date")
 
-        self.data = data_df.loc[self.experiment_config.START_DATE : self.experiment_config.END_DATE]
+        self.data = data_df.loc[
+            self.experiment_config.START_DATE : self.experiment_config.END_DATE
+        ]
 
         if len(self.data) == 0:
             msg = "Backtesting data is empty!"
@@ -62,19 +64,31 @@ class Runner:
 
         # TODO(@V): Handle by BacktestBuilder on top
         # TODO(@V): Separate files
-        prices_names = [stock + "_Price" for stock in self.experiment_config.ASSET_UNIVERSE]
+        prices_names = [
+            stock + "_Price" for stock in self.experiment_config.ASSET_UNIVERSE
+        ]
         if self.data.columns.isin(prices_names).any():
             self.prices = self.data.loc[:, prices_names]
-            self.prices = self.prices.rename(columns={col: col.rstrip("_Price") for col in self.prices.columns})
+            self.prices = self.prices.rename(
+                columns={col: col.rstrip("_Price") for col in self.prices.columns}
+            )
         else:
-            self.prices = pd.DataFrame(index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE)
+            self.prices = pd.DataFrame(
+                index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE
+            )
 
-        market_cap_names = [stock + "_Market_Cap" for stock in self.experiment_config.ASSET_UNIVERSE]
+        market_cap_names = [
+            stock + "_Market_Cap" for stock in self.experiment_config.ASSET_UNIVERSE
+        ]
         if self.data.columns.isin(market_cap_names).any():
             self.mkt_caps = self.data.loc[:, market_cap_names]
-            self.mkt_caps = self.mkt_caps.rename(columns={col: col.rstrip("_Price") for col in self.mkt_caps.columns})
+            self.mkt_caps = self.mkt_caps.rename(
+                columns={col: col.rstrip("_Price") for col in self.mkt_caps.columns}
+            )
         else:
-            self.mkt_caps = pd.DataFrame(index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE)
+            self.mkt_caps = pd.DataFrame(
+                index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE
+            )
 
         self.returns = Returns(self.data.loc[:, self.experiment_config.ASSET_UNIVERSE])
         self.rf = self.data[self.experiment_config.RF_NAME]
@@ -113,7 +127,9 @@ class Runner:
         hedger: BaseHedger | None = None,
     ) -> StrategyStatistics:
         hedging_assets_ret = (
-            Returns(simple_returns=hedging_assets).truncate(feature_processor.truncation_len)
+            Returns(simple_returns=hedging_assets).truncate(
+                feature_processor.truncation_len
+            )
             if hedging_assets is not None
             else hedging_assets
         )
@@ -194,7 +210,11 @@ class Runner:
             hedger=hedger,
         )
 
-    def plot_returns_histogram(self, start_date: pd.Timestamp | None = None, end_date: pd.Timestamp | None = None) -> None:
+    def plot_returns_histogram(
+        self,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None,
+    ) -> None:
         if start_date is None:
             start_date = self.strategy_total_r.index.min()
 
@@ -220,13 +240,19 @@ class Runner:
 
         plot_cumulative_pnls(
             strategy_total=self.strategy_total_r.loc[start_date:end_date],
-            buy_hold=self.factors.add(self.rf, axis=0).loc[start_date:end_date] if include_factors else None,
+            buy_hold=self.factors.add(self.rf, axis=0).loc[start_date:end_date]
+            if include_factors
+            else None,
             plot_log=True,
             name_strategy=strategy_name if strategy_name is not None else "Strategy",
             mkt_name=self.experiment_config.MKT_NAME,
         )
 
-    def plot_turnover(self, start_date: pd.Timestamp | None = None, end_date: pd.Timestamp | None = None) -> None:
+    def plot_turnover(
+        self,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None,
+    ) -> None:
         if start_date is None:
             start_date = self.strategy_total_r.index.min()
 
@@ -248,7 +274,9 @@ class Runner:
             end_date = self.strategy_total_r.index.max()
 
         strategy_total_r = self.strategy_total_r.loc[start_date:end_date]
-        factors = self.factors.loc[start_date:end_date].add(self.rf.loc[start_date:end_date], axis=0)
+        factors = self.factors.loc[start_date:end_date].add(
+            self.rf.loc[start_date:end_date], axis=0
+        )
 
         if mkt_only:
             plot_outperformance(
@@ -270,13 +298,19 @@ class Runner:
             raise ValueError(msg)
 
         filename = strategy_name + ".csv"
-        strategy_xs_r = self.strategy_excess_r.rename(columns={"excess_r": "strategy_xs_r"})
+        strategy_xs_r = self.strategy_excess_r.rename(
+            columns={"excess_r": "strategy_xs_r"}
+        )
         start, end = strategy_xs_r.index.min(), strategy_xs_r.index.max()
         factors = self.strategy_backtester.factors.loc[start:end]
         rf = self.strategy_backtester.rf.loc[start:end]
 
-        rebal_bool = pd.Series(1, index=self.strategy_backtester.rebal_weights.index, name="rebal")
-        rebal_bool = rebal_bool.reindex(self.strategy_weights.index).fillna(0).astype(bool)
+        rebal_bool = pd.Series(
+            1, index=self.strategy_backtester.rebal_weights.index, name="rebal"
+        )
+        rebal_bool = (
+            rebal_bool.reindex(self.strategy_weights.index).fillna(0).astype(bool)
+        )
 
         sample = strategy_xs_r.merge(factors, left_index=True, right_index=True)
         sample = sample.merge(rf, left_index=True, right_index=True)

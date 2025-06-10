@@ -48,7 +48,9 @@ class Backtester:
         self.trading_config = trading_config
         self.trading_lag = trading_config.trading_lag_days
         self.n_lookback_periods = n_lookback_periods
-        self.min_rolling_periods = n_lookback_periods if min_rolling_periods is None else min_rolling_periods
+        self.min_rolling_periods = (
+            n_lookback_periods if min_rolling_periods is None else min_rolling_periods
+        )
         self.rebal_freq = rebal_freq
         self.hedge_freq = hedge_freq
         self.verbose = verbose
@@ -72,7 +74,9 @@ class Backtester:
 
         self._prepare()
 
-    def __call__(self, strategy: BaseStrategy, hedger: BaseHedger | None = None) -> None:
+    def __call__(
+        self, strategy: BaseStrategy, hedger: BaseHedger | None = None
+    ) -> None:
         self.run(strategy, hedger)
 
     def generate_rebal_schedule(self, freq: int | str | None) -> pd.DatetimeIndex:
@@ -80,12 +84,20 @@ class Backtester:
             schedule = self.features.index
         elif isinstance(freq, str):
             date_index = self.features.index
-            schedule = self.features.groupby(date_index.to_period(freq.rstrip("E"))).tail(1).index
+            schedule = (
+                self.features.groupby(date_index.to_period(freq.rstrip("E")))
+                .tail(1)
+                .index
+            )
         elif isinstance(freq, int):
             date_index = self.features.index
-            generated_dates = pd.date_range(start=date_index.min(), end=date_index.max(), freq=f"{freq}D")
+            generated_dates = pd.date_range(
+                start=date_index.min(), end=date_index.max(), freq=f"{freq}D"
+            )
 
-            closest_dates_indices = date_index.get_indexer(generated_dates, method="nearest")
+            closest_dates_indices = date_index.get_indexer(
+                generated_dates, method="nearest"
+            )
 
             schedule = date_index[closest_dates_indices]
         else:
@@ -112,7 +124,9 @@ class Backtester:
             print(f"Num Train Iterations: {len(self.rebal_schedule)}")  # noqa: T201
 
     @staticmethod
-    def _accrue_returns(simple_returns: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.Series:
+    def _accrue_returns(
+        simple_returns: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp
+    ) -> pd.Series:
         """Accrues simple returns from start_date to end_date (end date is included!)."""
         ret_series = simple_returns.loc[start_date:end_date]
         ret_series = ret_series.fillna(0)
@@ -151,7 +165,9 @@ class Backtester:
 
         self._strategy_weights = float_w_normalized
 
-        strategy_transac_costs = self.tc_charger(weights=strategy_weights, returns=stocks_total_r.loc[start_date:])
+        strategy_transac_costs = self.tc_charger(
+            weights=strategy_weights, returns=stocks_total_r.loc[start_date:]
+        )
         strategy_total_r = strategy_total_r.sub(strategy_transac_costs, axis=0)
 
         strategy_excess_r = strategy_total_r.sub(rf, axis=0).rename(
@@ -166,7 +182,9 @@ class Backtester:
         rolling_weights = []
         last_rebal_date = None
         n_rebals = 0
-        for rebal_date in tqdm(self.rebal_schedule, desc="Computing Weights", disable=not self.verbose):
+        for rebal_date in tqdm(
+            self.rebal_schedule, desc="Computing Weights", disable=not self.verbose
+        ):
             if last_rebal_date is None:
                 self._first_rebal_date = rebal_date
 
@@ -176,7 +194,11 @@ class Backtester:
                 if last_rebal_date is None:
                     should_rebal = True
                 else:
-                    n_days_change = (rebal_date - last_rebal_date).days if last_rebal_date is not None else 0
+                    n_days_change = (
+                        (rebal_date - last_rebal_date).days
+                        if last_rebal_date is not None
+                        else 0
+                    )
                     should_rebal = n_days_change >= self.rebal_freq
             elif isinstance(self.rebal_freq, str):
                 should_rebal = rebal_date >= self.rebal_schedule[n_rebals]
@@ -203,8 +225,16 @@ class Backtester:
                 train_factors = self.factors.loc[:pred_date].iloc[1:]
                 train_rf = self.rf.loc[:pred_date].iloc[1:]
 
-                simple_train_xs_r = self.stocks_returns.simple_returns.loc[:pred_date].iloc[1:].sub(train_rf, axis=0)
-                log_train_xs_r = self.stocks_returns.log_returns.loc[:pred_date].iloc[1:].sub(train_rf, axis=0)
+                simple_train_xs_r = (
+                    self.stocks_returns.simple_returns.loc[:pred_date]
+                    .iloc[1:]
+                    .sub(train_rf, axis=0)
+                )
+                log_train_xs_r = (
+                    self.stocks_returns.log_returns.loc[:pred_date]
+                    .iloc[1:]
+                    .sub(train_rf, axis=0)
+                )
 
                 training_data = TrainingData(
                     features=train_features,
@@ -225,23 +255,35 @@ class Backtester:
                 strategy.fit(training_data=training_data)
 
                 weights = strategy(prediction_data=prediction_data)
-                weights = np.clip(weights, self.trading_config.min_exposure, self.trading_config.max_exposure)
+                weights = np.clip(
+                    weights,
+                    self.trading_config.min_exposure,
+                    self.trading_config.max_exposure,
+                )
 
-                rolling_weights.append([rebal_date, *weights.to_numpy().flatten().tolist()])
+                rolling_weights.append(
+                    [rebal_date, *weights.to_numpy().flatten().tolist()]
+                )
 
                 last_rebal_date = rebal_date
                 n_rebals += 1
 
         stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
-        self._strategy_weights = pd.DataFrame(rolling_weights, columns=stocks_columns).set_index("date")
+        self._strategy_weights = pd.DataFrame(
+            rolling_weights, columns=stocks_columns
+        ).set_index("date")
 
         return self._strategy_weights
 
-    def get_hedger_weights(self, hedger: BaseHedger, strategy_weights: pd.DataFrame) -> pd.DataFrame:
+    def get_hedger_weights(
+        self, hedger: BaseHedger, strategy_weights: pd.DataFrame
+    ) -> pd.DataFrame:
         rolling_weights = []
         last_hedge_date = None
         n_hedges = 0
-        for rebal_date in tqdm(self.hedge_schedule, desc="Hedging", disable=not self.verbose):
+        for rebal_date in tqdm(
+            self.hedge_schedule, desc="Hedging", disable=not self.verbose
+        ):
             if rebal_date < self._first_rebal_date:
                 should_hedge = False
             elif self.hedge_freq is None:
@@ -250,7 +292,11 @@ class Backtester:
                 if last_hedge_date is None:
                     should_hedge = True
                 else:
-                    n_days_change = (rebal_date - last_hedge_date).days if last_hedge_date is not None else 0
+                    n_days_change = (
+                        (rebal_date - last_hedge_date).days
+                        if last_hedge_date is not None
+                        else 0
+                    )
                     should_hedge = n_days_change >= self.hedge_freq
             elif isinstance(self.hedge_freq, str):
                 should_hedge = rebal_date == self.rebal_schedule[n_hedges]
@@ -280,15 +326,29 @@ class Backtester:
                 train_factors = self.factors.loc[:pred_date].iloc[1:]
                 train_rf = self.rf.loc[:pred_date].iloc[1:]
 
-                simple_train_xs_r = self.stocks_returns.simple_returns.loc[:pred_date].iloc[1:].sub(train_rf, axis=0)
-                log_train_xs_r = self.stocks_returns.log_returns.loc[:pred_date].iloc[1:].sub(train_rf, axis=0)
+                simple_train_xs_r = (
+                    self.stocks_returns.simple_returns.loc[:pred_date]
+                    .iloc[1:]
+                    .sub(train_rf, axis=0)
+                )
+                log_train_xs_r = (
+                    self.stocks_returns.log_returns.loc[:pred_date]
+                    .iloc[1:]
+                    .sub(train_rf, axis=0)
+                )
 
-                train_hedging_assets_r = self.hedging_assets.simple_returns.loc[:pred_date].iloc[1:]
+                train_hedging_assets_r = self.hedging_assets.simple_returns.loc[
+                    :pred_date
+                ].iloc[1:]
 
                 training_data = TrainingData(
                     features=train_features,
-                    prices=train_prices[picked_assets] if len(train_prices) > 0 else train_prices,
-                    market_cap=train_mkt_caps[picked_assets] if len(train_mkt_caps) > 0 else train_mkt_caps,
+                    prices=train_prices[picked_assets]
+                    if len(train_prices) > 0
+                    else train_prices,
+                    market_cap=train_mkt_caps[picked_assets]
+                    if len(train_mkt_caps) > 0
+                    else train_mkt_caps,
                     factors=train_factors,
                     simple_excess_returns=simple_train_xs_r[picked_assets],
                     log_excess_returns=log_train_xs_r[picked_assets],
@@ -296,8 +356,12 @@ class Backtester:
 
                 prediction_data = PredictionData(
                     features=pred_features,
-                    prices=pred_prices[picked_assets] if len(pred_prices) > 0 else pred_prices,
-                    market_cap=pred_mkt_caps[picked_assets] if len(pred_mkt_caps) > 0 else pred_mkt_caps,
+                    prices=pred_prices[picked_assets]
+                    if len(pred_prices) > 0
+                    else pred_prices,
+                    market_cap=pred_mkt_caps[picked_assets]
+                    if len(pred_mkt_caps) > 0
+                    else pred_mkt_caps,
                 )
 
                 hedger.fit(
@@ -309,13 +373,17 @@ class Backtester:
                     asset_weights=period_end_weights.loc[picked_assets],
                 )
 
-                rolling_weights.append([rebal_date, *hedge_weights.to_numpy().flatten().tolist()])
+                rolling_weights.append(
+                    [rebal_date, *hedge_weights.to_numpy().flatten().tolist()]
+                )
 
                 last_hedge_date = rebal_date
                 n_hedges += 1
 
         hedge_columns = ["date", *list(self.hedging_assets.simple_returns.columns)]
-        self._hedge_rebal_weights = pd.DataFrame(rolling_weights, columns=hedge_columns).set_index("date")
+        self._hedge_rebal_weights = pd.DataFrame(
+            rolling_weights, columns=hedge_columns
+        ).set_index("date")
 
         return self._hedge_rebal_weights
 
@@ -326,12 +394,20 @@ class Backtester:
         rf: pd.Series,
         add_total_r: pd.DataFrame | None = None,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        total_r = pd.DataFrame(index=total_returns.index, columns=["total_r"], dtype=np.float64)
-        level_data = pd.DataFrame(index=total_returns.index, columns=["level_data"], dtype=np.float64)
-        float_weights = pd.DataFrame(index=total_returns.index, columns=[*total_returns.columns.tolist()])
+        total_r = pd.DataFrame(
+            index=total_returns.index, columns=["total_r"], dtype=np.float64
+        )
+        level_data = pd.DataFrame(
+            index=total_returns.index, columns=["level_data"], dtype=np.float64
+        )
+        float_weights = pd.DataFrame(
+            index=total_returns.index, columns=[*total_returns.columns.tolist()]
+        )
 
         total_returns = (
-            pd.concat([total_returns, rf], axis=1) if add_total_r is None else pd.concat([total_returns, add_total_r, rf], axis=1)
+            pd.concat([total_returns, rf], axis=1)
+            if add_total_r is None
+            else pd.concat([total_returns, add_total_r, rf], axis=1)
         )
         n_auxilary_cols = 1 if add_total_r is None else 2
         weights = weights.copy()

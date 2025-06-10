@@ -15,7 +15,7 @@ from qamsi.strategies.base_strategy import BaseStrategy
 
 
 class MinVariance(BaseStrategy):
-    PERCENTAGE_VALID_POINTS = 0.9
+    PERCENTAGE_VALID_POINTS = 1.0
 
     def __init__(
         self,
@@ -30,26 +30,36 @@ class MinVariance(BaseStrategy):
         self.window_size = window_size
 
     def _fit(self, training_data: TrainingData) -> None:
-        ret = training_data.simple_excess_returns
+        ret = training_data.simple_excess_returns[self.available_assets]
 
         start_date = ret.index[-1] - pd.Timedelta(days=self.window_size)
         ret = ret.loc[start_date:]
 
         n_valid_points = (~ret.isna()).sum(axis=0) / len(ret)
-        valid_stocks = n_valid_points[n_valid_points >= self.PERCENTAGE_VALID_POINTS].index
+        valid_stocks = list(
+            n_valid_points[n_valid_points >= self.PERCENTAGE_VALID_POINTS].index
+        )
 
-        self.available_assets = list(set(self.available_assets).union(set(valid_stocks)))
+        self.available_assets = valid_stocks
         self.cov_estimator.available_assets = self.available_assets
 
-        training_data.simple_excess_returns = training_data.simple_excess_returns[self.available_assets]
+        training_data.simple_excess_returns = training_data.simple_excess_returns[
+            self.available_assets
+        ]
+        training_data.simple_excess_returns = training_data.simple_excess_returns.loc[
+            start_date:
+        ]
 
-        first_valid_date = training_data.simple_excess_returns.first_valid_index()
-        training_data.simple_excess_returns = training_data.simple_excess_returns.loc[first_valid_date:]
-
-        training_data.log_excess_returns = training_data.log_excess_returns.loc[first_valid_date:, self.available_assets]
-        training_data.targets = training_data.targets.loc[first_valid_date:, self.available_assets] if training_data.targets is not None else None
-        training_data.features = training_data.features.loc[first_valid_date:]
-        training_data.factors = training_data.factors.loc[first_valid_date:]
+        training_data.log_excess_returns = training_data.log_excess_returns.loc[
+            start_date:, self.available_assets
+        ]
+        training_data.targets = (
+            training_data.targets.loc[start_date:, self.available_assets]
+            if training_data.targets is not None
+            else None
+        )
+        training_data.features = training_data.features.loc[start_date:]
+        training_data.factors = training_data.factors.loc[start_date:]
 
         self.cov_estimator.fit(training_data)
 
@@ -69,7 +79,9 @@ class MinVariance(BaseStrategy):
 
         return pd.Series(self.var_min.results["weights"])
 
-    def _get_weights(self, prediction_data: PredictionData, weights_: pd.DataFrame) -> pd.DataFrame:
+    def _get_weights(
+        self, prediction_data: PredictionData, weights_: pd.DataFrame
+    ) -> pd.DataFrame:
         covmat = self.cov_estimator.predict(prediction_data)
         weights = self._optimize(covmat)
 

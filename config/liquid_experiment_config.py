@@ -10,7 +10,9 @@ from qamsi.config.experiment_config import BaseExperimentConfig
 @dataclass
 class ExperimentConfig(BaseExperimentConfig):
     # Strategy Settings
-    FRACTIONAL_DIFFERENCING: float = field(default=0.5, metadata={"docs": "Fractional Difference Order"})
+    FRACTIONAL_DIFFERENCING: float = field(
+        default=0.5, metadata={"docs": "Fractional Difference Order"}
+    )
 
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
@@ -46,17 +48,32 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     # Filenames
-    INITIAL_DF_FILENAME: str = field(default="initial_df.csv", metadata={"docs": "Initial preprocessed data"})
+    INITIAL_DF_FILENAME: str = field(
+        default="initial_df.csv", metadata={"docs": "Initial preprocessed data"}
+    )
 
-    JKP_DATA_FILENAME: str = field(default="jkp_data.csv", metadata={"docs": "JKP Stock Characteristics"})
+    JKP_DATA_FILENAME: str = field(
+        default="jkp_data.csv", metadata={"docs": "JKP Stock Characteristics"}
+    )
 
-    STOCKS_LIST_FILENAME: str = field(default="liquid_stocks_list.csv", metadata={"docs": "Stocks list"})
+    STOCKS_LIST_FILENAME: str = field(
+        default="liquid_stocks_list.csv", metadata={"docs": "Stocks list"}
+    )
 
-    INITIAL_FEATURES_FILENAME: str = field(default="initial_features_df.csv", metadata={"docs": "Initial preprocessed features"})
+    INITIAL_FEATURES_FILENAME: str = field(
+        default="initial_features_df.csv",
+        metadata={"docs": "Initial preprocessed features"},
+    )
 
-    DF_FILENAME: str = field(default="liquid_data.csv", metadata={"docs": "Preprocessed data (after experiments)"})
+    DF_FILENAME: str = field(
+        default="liquid_data.csv",
+        metadata={"docs": "Preprocessed data (after experiments)"},
+    )
 
-    RETURNS_FILENAME: str = field(default="returns_incl_div_consituents_w_name.csv", metadata={"docs": "Returns With Dividends"})
+    RETURNS_FILENAME: str = field(
+        default="returns_incl_div_consituents_w_name.csv",
+        metadata={"docs": "Returns With Dividends"},
+    )
 
     BETTER_RETURNS_FILENAME: str = field(
         default="returns_data_cleaned_better.parquet",
@@ -96,7 +113,9 @@ class ExperimentConfig(BaseExperimentConfig):
 
     N_LOOKBEHIND_PERIODS: int = field(
         default=252,
-        metadata={"docs": "Number of rebalance periods to take into rolling regression"},
+        metadata={
+            "docs": "Number of rebalance periods to take into rolling regression"
+        },
     )
 
     MIN_ROLLING_PERIODS: int = field(
