@@ -1,113 +1,100 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from qamsi.runner import RunResult
+from enum import Enum
 
 import pandas as pd
-from config.experiment_config import ExperimentConfig
-from config.trading_config import TradingConfig
-from qamsi.hedge.market_futures_hedge import MarketFuturesHedge
+from qamsi.config.trading_config import TradingConfig
+from qamsi.backtest.assessor import StrategyStatistics
 from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
-from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
 
-HEDGE = False
+from config.liquid_experiment_config import ExperimentConfig as LiquidConfig
+from config.spx_experiment_config import ExperimentConfig as SPXConfig
 
 
-def run_backtest(
-    cov_estimator: BaseCovEstimator,
-    rebalance_mode: str,
-    verbose: bool = False,
-    plot_progress: bool = False,
-) -> RunResult:
-    experiment_config = ExperimentConfig()
+class Dataset(Enum):
+    LIQUID_US = LiquidConfig
+    SPX_US = SPXConfig
+
+
+REBAL_FREQ = "ME"
+DATASET = Dataset.SPX_US
+
+ESTIMATION_WINDOW = 365 * 5
+ESTIMATOR = CovEstimators.RISKFOLIO.value()
+
+SAVE = True
+
+def run_backtest() -> StrategyStatistics:
+    experiment_config = DATASET.value()
+
     stocks = tuple(
-        pd.read_csv(
-            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
-        ).columns
+        pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME).iloc[:, 0].astype(str).tolist(),
     )
     experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
-    # experiment_config.FACTORS = ("spx",)
 
-    # experiment_config.TRAIN_START_DATE = pd.Timestamp("2019-06-30")
+    experiment_config.MIN_ROLLING_PERIODS = ESTIMATION_WINDOW + 1
+    experiment_config.N_LOOKBEHIND_PERIODS = None
+    experiment_config.REBALANCE_FREQ = REBAL_FREQ
 
-    experiment_config.N_LOOKBEHIND_PERIODS = 252
-    experiment_config.REBALANCE_FREQ_DAYS = 20
+    factors = pd.read_csv(experiment_config.PATH_OUTPUT / "factors.csv")
+    factors["date"] = pd.to_datetime(factors["date"])
+    factors = factors.set_index("date")
+    factor_names = tuple(factors.columns.astype(str).tolist())
+    experiment_config.FACTORS = factor_names
+
+    prices = [stock + "_Price" for stock in list(stocks)]
+    preprocessor = Preprocessor(
+        exclude_names=[*list(stocks), experiment_config.RF_NAME, *experiment_config.HEDGING_ASSETS, *factor_names, *prices],
+    )
 
     trading_config = TradingConfig(
         broker_fee=0.05 / 100,
-        bid_ask_spread=0.03 / 100,  # Taken as average bid-ask spread
-        max_exposure=0.5,
-        min_exposure=0,
+        bid_ask_spread=0.03 / 100,
         total_exposure=1,
+        max_exposure=1,
+        min_exposure=0,
+        trading_lag_days=1,
+    )
+
+    strategy = MinVariance(
+        cov_estimator=ESTIMATOR,
+        trading_config=trading_config,
+        window_size=ESTIMATION_WINDOW,
     )
 
     runner = Runner(
         experiment_config=experiment_config,
         trading_config=trading_config,
-        verbose=verbose,
-        plot=plot_progress,
+        verbose=True,
     )
 
-    hedger = MarketFuturesHedge()
-
-    # Handles the features
-    prices = [stock + "_Price" for stock in list(stocks)]
-    preprocessor = Preprocessor(
-        exclude_names=[*prices, *list(stocks)]
-    )
-
-    strategy = MinVariance(
-        cov_estimator=cov_estimator,
-        trading_config=trading_config,
-        rebalance_mode=rebalance_mode,
-    )
-
-    baseline_strategy = MinVariance(
-        cov_estimator=CovEstimators.HISTORICAL.value(),
-        trading_config=trading_config,
-        rebalance_mode=rebalance_mode,
-    )
-
-    run_result = runner.train(
+    result = runner(
         feature_processor=preprocessor,
         strategy=strategy,
-        baseline_strategy=baseline_strategy,
-        hedger=hedger if HEDGE else None,
+        hedger=None,
     )
 
-    runner.plot_cumulative()
+    strategy_name = ESTIMATOR.__class__.__name__
 
-    runner.plot_cumulative(include_factors=True)
+    if SAVE:
+        runner.save(DATASET.name + strategy_name + f"_rebal{REBAL_FREQ}")
+
+    runner.plot_cumulative(
+        strategy_name=strategy_name,
+        include_factors=True,
+    )
 
     runner.plot_turnover()
 
-    runner.plot_returns_histogram_vs_baseline()
+    runner.plot_outperformance(mkt_only=True)
 
-    runner.plot_outperformance()
-
-    return run_result
+    return result
 
 
 if __name__ == "__main__":
-    ESTIMATOR = CovEstimators.HISTORICAL.value()
-    REBALANCE_MODE = "fully"
-    VERBOSE = True
-    PLOT_PROGRESS = False
+    run_result = run_backtest()
 
-    run_result = run_backtest(
-        cov_estimator=ESTIMATOR,
-        rebalance_mode=REBALANCE_MODE,
-        verbose=VERBOSE,
-        plot_progress=PLOT_PROGRESS,
-    )
-
-    print(run_result.strategy)
-
-    print("***")
-
-    print(run_result.baseline)
+    print(run_result)  # noqa: T201

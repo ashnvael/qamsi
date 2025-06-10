@@ -15,10 +15,11 @@ from scipy.stats import levene, ttest_ind
 @dataclass
 class StrategyStatistics:
     final_nav: float
-    final_rf: float
-
-    mean: float
-    std: float
+    geom_avg_total_r: float
+    geom_avg_xs_r: float
+    std_xs_r: float
+    min_xs_r: float
+    max_xs_r: float
     skew: float
     kurtosis: float
 
@@ -54,21 +55,22 @@ class StrategyStatistics:
 
 
 class Assessor:
-    def __init__(self, rf_rate: pd.DataFrame, factors: pd.DataFrame) -> None:
+    def __init__(
+        self,
+        rf_rate: pd.DataFrame,
+        factors: pd.DataFrame,
+        mkt_name: str = "spx",
+        factor_annual: int | None = None,
+    ) -> None:
         self.rf_rate = rf_rate
         self.factors = factors
+        self.mkt_name = mkt_name
+        self.factor_annual = factor_annual
 
     @staticmethod
-    def _get_benchmark(
-        strategy_excess: pd.Series, factors: pd.DataFrame | None
-    ) -> tuple[Any, Any, Callable[[], Any]]:
+    def _get_benchmark(strategy_excess: pd.Series, factors: pd.DataFrame | None) -> tuple[Any, Any, Callable[[], Any]]:
         y = strategy_excess
-
-        features = (
-            factors
-            if factors is not None
-            else pd.DataFrame(index=strategy_excess.index)
-        )
+        features = factors if factors is not None else pd.DataFrame(index=strategy_excess.index)
 
         features = sm.add_constant(features)
 
@@ -79,16 +81,10 @@ class Assessor:
         return benchmark_excess_r, lr.params.iloc[1:], lr.pvalues
 
     @staticmethod
-    def _get_timing_ability(
-        strategy_excess: pd.Series, factors: pd.DataFrame | None
-    ) -> tuple[float, float]:
+    def _get_timing_ability(strategy_excess: pd.Series, factors: pd.DataFrame | None) -> tuple[float, float]:
         y = strategy_excess
 
-        features = (
-            factors
-            if factors is not None
-            else pd.DataFrame(index=strategy_excess.index)
-        )
+        features = factors if factors is not None else pd.DataFrame(index=strategy_excess.index)
 
         # Treynor-Mazuy procedure
         features_timing = pd.Series(np.maximum(features, 0))
@@ -101,26 +97,26 @@ class Assessor:
 
     @staticmethod
     def _get_max_drawdowns(total_returns: pd.Series) -> float:
-        total_nav = 1 + total_returns
+        total_nav = total_returns.add(1).cumprod()
         prev_peak = total_nav.cummax()
-
         return ((total_nav - prev_peak) / prev_peak).min()
 
     @staticmethod
-    def _get_sharpe_ratio_pvalue(
-        strategy_total_r: pd.Series, baseline_total_r: pd.Series
-    ) -> float:
+    def _get_sharpe_ratio_pvalue(strategy_total_r: pd.Series, baseline_total_r: pd.Series) -> float:
         raise NotImplementedError
 
     def _run(self, strategy_total: pd.Series) -> StrategyStatistics:
         if len(strategy_total.shape) > 1:
             strategy_total = strategy_total.iloc[:, 0]  # type: ignore  # noqa: PGH003
 
-        factor_annual = 365 // strategy_total.index.diff().min().days  # type: ignore  # noqa: PGH003
+        if self.factor_annual is None:
+            day_diff = strategy_total.index.diff().days
+            factor_annual = round(np.nanmean(365 // day_diff))
+        else:
+            factor_annual = self.factor_annual
         n_periods = strategy_total.shape[0] / factor_annual
 
-        ew = np.ones(self.factors.shape[1]) / self.factors.shape[1]
-        buy_hold_total = (self.factors * ew).sum(axis=1)
+        buy_hold_total = self.factors[self.mkt_name].add(self.rf_rate, axis=0)
 
         final_nav = strategy_total.add(1).prod()
         final_buy_hold = buy_hold_total.add(1).prod()
@@ -130,53 +126,49 @@ class Assessor:
         buy_hold_mean = final_buy_hold ** (1 / n_periods) - 1
         rf_mean = final_rf ** (1 / n_periods) - 1
 
-        strat_std = strategy_total.std() * np.sqrt(factor_annual)
+        strat_excess_mean = strat_mean - rf_mean
 
-        strat_skew = strategy_total.skew()
-        strat_kurtosis = strategy_total.kurtosis()
-        strategy_max_dd = self._get_max_drawdowns(strategy_total)
+        strategy_excess = strategy_total.sub(self.rf_rate, axis=0)
+        buy_hold_excess = buy_hold_total.sub(self.rf_rate, axis=0)
 
-        sr_strategy_total = (strat_mean - rf_mean) / strat_std
+        strat_std = strategy_excess.std() * np.sqrt(factor_annual)
+        strat_min = strategy_excess.min()
+        strat_max = strategy_excess.max()
+
+        strat_skew = strategy_excess.skew()
+        strat_kurtosis = strategy_excess.kurtosis()
+        strategy_max_dd = self._get_max_drawdowns(strategy_excess)
+
+        sr_strategy_total = strat_excess_mean / strat_std
 
         buy_hold_alpha = strat_mean - buy_hold_mean
-        buy_hold_tracking_error = np.std(strategy_total - buy_hold_total) * np.sqrt(
-            factor_annual
-        )
+        buy_hold_tracking_error = np.std(strategy_excess - buy_hold_excess) * np.sqrt(factor_annual)
         buy_hold_ir = buy_hold_alpha / buy_hold_tracking_error
 
-        strategy_excess, buy_hold_excess = (
-            strategy_total - self.rf_rate.to_numpy(),
-            buy_hold_total - self.rf_rate.to_numpy(),
-        )
-
-        benchmark_excess, loadings, pvalues = self._get_benchmark(
-            strategy_excess, self.factors
-        )
-        benchmark_total = benchmark_excess + self.rf_rate
+        benchmark_excess, loadings, pvalues = self._get_benchmark(strategy_excess, self.factors)
+        benchmark_total = benchmark_excess.add(self.rf_rate, axis=0)
         final_benchmark = benchmark_total.add(1).prod()
         benchmark_mean = final_benchmark ** (1 / n_periods) - 1
 
         benchmark_alpha = strat_mean - benchmark_mean
-        benchmark_tracking_error = np.std(strategy_total - benchmark_total) * np.sqrt(
-            factor_annual
-        )
+        benchmark_tracking_error = np.std(strategy_excess - benchmark_excess) * np.sqrt(factor_annual)
         benchmark_ir = benchmark_alpha / benchmark_tracking_error
         alpha_benchmark_pvalue = pvalues.iloc[0]  # type: ignore  # noqa: PGH003
 
-        ttest_pval = ttest_ind(
-            strategy_excess, buy_hold_excess, alternative="greater"
-        ).pvalue
+        ttest_pval = ttest_ind(strategy_excess, buy_hold_excess, alternative="greater").pvalue
         levene_pval = levene(strategy_excess, buy_hold_excess).pvalue
 
-        timing_ability_coef, timing_ability_pval = self._get_timing_ability(
-            strategy_excess, buy_hold_excess
-        )
+        timing_ability_coef, timing_ability_pval = self._get_timing_ability(strategy_excess, buy_hold_excess)
+
+        # TODO(@V): 3 autocorrelation lags
 
         return StrategyStatistics(
             final_nav=final_nav,
-            final_rf=final_rf,
-            mean=strat_mean,
-            std=strat_std,
+            geom_avg_total_r=strat_mean,
+            geom_avg_xs_r=strat_excess_mean,
+            std_xs_r=strat_std,
+            min_xs_r=strat_min,
+            max_xs_r=strat_max,
             skew=strat_skew,  # type: ignore  # noqa: PGH003
             kurtosis=strat_kurtosis,  # type: ignore  # noqa: PGH003
             sharpe=sr_strategy_total,

@@ -5,50 +5,41 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from config.experiment_config import ExperimentConfig
-    from config.trading_config import TradingConfig
-    from qamsi.features.base_preprocessor import BasePreprocessor
-    from qamsi.hedge.hedger import Hedger
+    from qamsi.config.experiment_config import BaseExperimentConfig
+    from qamsi.config.trading_config import TradingConfig
+    from qamsi.features.preprocessor import Preprocessor
+    from qamsi.hedge.base_hedger import BaseHedger
     from qamsi.strategies.base_strategy import BaseStrategy
 
-from dataclasses import dataclass
+from enum import Enum
 
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 from qamsi.backtest.assessor import Assessor, StrategyStatistics
 from qamsi.backtest.backtester import Backtester
 from qamsi.backtest.plot import (
     plot_cumulative_pnls,
     plot_histogram,
-    plot_histogram_vs_baseline,
+    plot_outperformance,
     plot_turnover,
 )
 from qamsi.backtest.transaction_costs_charger import TransactionCostCharger
 from qamsi.base.returns import Returns
 
 
-@dataclass
-class RunResult:
-    strategy: StrategyStatistics
-    baseline: StrategyStatistics
-
-
 class Runner:
     def __init__(
         self,
-        experiment_config: ExperimentConfig,
+        experiment_config: BaseExperimentConfig,
         trading_config: TradingConfig,
         ml_metrics: list[Callable] | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
-        plot: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.experiment_config = experiment_config
         self.trading_config = trading_config
 
         self.ml_metrics = ml_metrics
         self.verbose = verbose
-        self.plot = plot
 
         self.tc_charger = TransactionCostCharger(
             trading_config=self.trading_config,
@@ -56,185 +47,154 @@ class Runner:
 
         self._prepare()
 
+        self._is_hedged = None
+
     def _prepare(self) -> None:
-        data_df = pd.read_csv(
-            self.experiment_config.PATH_OUTPUT / self.experiment_config.DF_FILENAME
-        )
+        data_df = pd.read_csv(self.experiment_config.PATH_OUTPUT / self.experiment_config.DF_FILENAME)
         data_df["date"] = pd.to_datetime(data_df["date"])
         data_df = data_df.set_index("date")
 
-        self.train_data = data_df.loc[
-            self.experiment_config.TRAIN_START_DATE : self.experiment_config.TRAIN_END_DATE
+        self.data = data_df.loc[self.experiment_config.START_DATE : self.experiment_config.END_DATE]
+
+        if len(self.data) == 0:
+            msg = "Backtesting data is empty!"
+            raise ValueError(msg)
+
+        # TODO(@V): Handle by BacktestBuilder on top
+        # TODO(@V): Separate files
+        prices_names = [stock + "_Price" for stock in self.experiment_config.ASSET_UNIVERSE]
+        if self.data.columns.isin(prices_names).any():
+            self.prices = self.data.loc[:, prices_names]
+            self.prices = self.prices.rename(columns={col: col.rstrip("_Price") for col in self.prices.columns})
+        else:
+            self.prices = pd.DataFrame(index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE)
+
+        market_cap_names = [stock + "_Market_Cap" for stock in self.experiment_config.ASSET_UNIVERSE]
+        if self.data.columns.isin(market_cap_names).any():
+            self.mkt_caps = self.data.loc[:, market_cap_names]
+            self.mkt_caps = self.mkt_caps.rename(columns={col: col.rstrip("_Price") for col in self.mkt_caps.columns})
+        else:
+            self.mkt_caps = pd.DataFrame(index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE)
+
+        self.returns = Returns(self.data.loc[:, self.experiment_config.ASSET_UNIVERSE])
+        self.rf = self.data[self.experiment_config.RF_NAME]
+
+        # Factors are passed as excess returns
+        self.factors = self.data.loc[:, self.experiment_config.FACTORS]
+
+        # Hedging assets are passed as excess returns
+        self.hedging_assets = self.data.loc[:, self.experiment_config.HEDGING_ASSETS]
+
+        exclude = [
+            *self.experiment_config.ASSET_UNIVERSE,
+            *prices_names,
+            *market_cap_names,
+            self.experiment_config.RF_NAME,
+            *self.experiment_config.FACTORS,
+            *self.experiment_config.HEDGING_ASSETS,
         ]
-        self.test_data = data_df.loc[
-            self.experiment_config.TRAIN_END_DATE : self.experiment_config.TEST_END_DATE
-        ]
-
-        if self.experiment_config.ASSET_UNIVERSE is None:
-            self.experiment_config.ASSET_UNIVERSE = tuple(
-                set(self.train_data.columns.tolist())
-                - {self.experiment_config.RF_NAME}
-                - set(self.experiment_config.FACTORS),
-            )
-        self.train_returns = Returns(
-            self.train_data.loc[:, self.experiment_config.ASSET_UNIVERSE].iloc[1:]
-        )
-        self.test_returns = Returns(
-            self.test_data.loc[:, self.experiment_config.ASSET_UNIVERSE].iloc[1:]
-        )
-
-        self.train_rf = self.train_data[[self.experiment_config.RF_NAME]].iloc[1:]
-        self.test_rf = self.test_data[[self.experiment_config.RF_NAME]].iloc[1:]
-
-        self.train_factors = self.train_data.loc[
-            :, self.experiment_config.FACTORS
-        ].iloc[1:]
-        self.test_factors = self.test_data.loc[:, self.experiment_config.FACTORS].iloc[
-            1:
-        ]
-
-        self.train_data = self.train_data.shift(1).iloc[1:]
-        self.test_data = self.test_data.shift(1).iloc[1:]
+        self.features = self.data.drop(columns=exclude, errors="ignore")
 
         if self.verbose:
-            print(
-                f"Train data on {self.train_data.index.min()} to {self.train_data.index.max()}"
-            )  # noqa: T201
-            if len(self.test_data) > 0:
-                print(
-                    f"Test data on {self.test_data.index.min()} to {self.test_data.index.max()}"
-                )  # noqa: T201
-            print(f"Num Train Iterations: {len(self.train_data)}")  # noqa: T201
+            print(f"Backtest on {self.data.index.min()} to {self.data.index.max()}")  # noqa: T201
 
     def available_features(self) -> list[str]:
-        return self.train_data.columns.tolist()
+        return self.features.columns.tolist()
 
     def _run_backtest(  # noqa: PLR0913
         self,
-        feature_processor: BasePreprocessor,
+        feature_processor: Preprocessor,
         strategy: BaseStrategy,
-        data: pd.DataFrame,
+        features: pd.DataFrame,
         returns: Returns,
-        rf: pd.DataFrame,
-        hedger: Hedger | None = None,
+        rf: pd.Series,
+        factors: pd.DataFrame,
         hedging_assets: pd.DataFrame | None = None,
-    ) -> Backtester:
+        hedger: BaseHedger | None = None,
+    ) -> StrategyStatistics:
+        hedging_assets_ret = (
+            Returns(simple_returns=hedging_assets).truncate(feature_processor.truncation_len)
+            if hedging_assets is not None
+            else hedging_assets
+        )
+        hedge_freq = (
+            self.experiment_config.HEDGE_FREQ
+            if self.experiment_config.HEDGE_FREQ is not None
+            else self.experiment_config.REBALANCE_FREQ
+        )
+
         backtester = Backtester(
             stocks_returns=returns.truncate(feature_processor.truncation_len),
-            features=feature_processor(data),
-            rf_rate=rf.iloc[feature_processor.truncation_len :],
+            features=feature_processor(features),
+            prices=self.prices.iloc[feature_processor.truncation_len :],
+            mkt_caps=self.mkt_caps.iloc[feature_processor.truncation_len :],
+            rf=rf.iloc[feature_processor.truncation_len :],
+            factors=factors.iloc[feature_processor.truncation_len :],
             tc_charger=self.tc_charger,
             trading_config=self.trading_config,
             n_lookback_periods=self.experiment_config.N_LOOKBEHIND_PERIODS,
             min_rolling_periods=self.experiment_config.MIN_ROLLING_PERIODS,
-            rebal_freq_days=self.experiment_config.REBALANCE_FREQ_DAYS,
+            rebal_freq=self.experiment_config.REBALANCE_FREQ,
+            hedge_freq=hedge_freq,
             verbose=self.verbose,
-            plot=self.plot,
-            hedging_assets=hedging_assets.truncate(feature_processor.truncation_len)
-            if hedging_assets is not None
-            else hedging_assets,
+            hedging_assets=hedging_assets_ret,
         )
         backtester(strategy, hedger)
-        return backtester
 
-    def _run(  # noqa: PLR0913
-        self,
-        feature_processor: BasePreprocessor,
-        strategy: BaseStrategy,
-        baseline_strategy: BaseStrategy,
-        data: pd.DataFrame,
-        returns: Returns,
-        factors: pd.DataFrame,
-        rf: pd.DataFrame,
-        hedger: Hedger | None = None,
-    ) -> RunResult:
-        self.strategy_backtester = self._run_backtest(
-            feature_processor,
-            strategy,
-            data,
-            returns,
-            rf,
-            hedger,
-            Returns(simple_returns=factors),
-        )
+        self.strategy_backtester = backtester
 
-        self.strategy_total_r = self.strategy_backtester.total_returns
-        self.strategy_excess_r = self.strategy_backtester.excess_returns
-        self.strategy_weights = self.strategy_backtester.weights
+        self.strategy_total_r = self.strategy_backtester.strategy_total_r
+        self.strategy_excess_r = self.strategy_backtester.strategy_excess_r
+        self.strategy_weights = self.strategy_backtester.strategy_weights
         self.strategy_turnover = self.strategy_backtester.turnover
 
-        self.baseline_backtester = self._run_backtest(
-            feature_processor,
-            baseline_strategy,
-            data,
-            returns,
-            rf,
-            hedger,
-            Returns(simple_returns=factors),
-        )
-        self.baseline_total_r = self.baseline_backtester.total_returns
-        self.baseline_excess_r = self.baseline_backtester.excess_returns
-        self.baseline_weights = self.baseline_backtester.weights
-
-        self.factors_total_r = (
-            self.strategy_backtester.acc_factors
-            + self.strategy_backtester.acc_rf_rate.to_numpy().flatten()[:, np.newaxis]
-        )
+        start_date = self.strategy_total_r.index.min()
+        end_date = self.strategy_total_r.index.max()
 
         assessor = Assessor(
-            rf_rate=self.strategy_backtester.acc_rf_rate.iloc[:, 0],
-            factors=self.strategy_backtester.acc_factors,
+            rf_rate=self.rf.loc[start_date:end_date],
+            factors=self.factors.loc[start_date:end_date],
+            mkt_name=self.experiment_config.MKT_NAME,
         )
 
-        strategy_statistics = assessor(self.strategy_backtester.total_returns)
-        baseline_statistics = assessor(self.baseline_backtester.total_returns)
+        return assessor(self.strategy_total_r)
 
-        return RunResult(
-            strategy=strategy_statistics,
-            baseline=baseline_statistics,
-        )
-
-    def train(
+    def run(
         self,
-        feature_processor: BasePreprocessor,
+        feature_processor: Preprocessor,
         strategy: BaseStrategy,
-        baseline_strategy: BaseStrategy,
-        hedger: Hedger | None = None,
-    ) -> RunResult:
-        return self._run(
+        hedger: BaseHedger | None = None,
+    ) -> StrategyStatistics:
+        if hedger is None:
+            self._is_hedged = False
+        else:
+            self._is_hedged = True
+            hedger.market_name = self.experiment_config.MKT_NAME
+
+        return self._run_backtest(
             feature_processor=feature_processor,
             strategy=strategy,
-            baseline_strategy=baseline_strategy,
-            data=self.train_data,
-            returns=self.train_returns,
-            factors=self.train_factors,
-            rf=self.train_rf,
+            features=self.features,
+            returns=self.returns,
+            hedging_assets=self.hedging_assets,
+            rf=self.rf,
+            factors=self.factors,
             hedger=hedger,
         )
 
-    def test(
+    def __call__(
         self,
-        feature_processor: BasePreprocessor,
+        feature_processor: Preprocessor,
         strategy: BaseStrategy,
-        baseline_strategy: BaseStrategy,
-        hedger: Hedger | None = None,
-    ) -> RunResult:
-        return self._run(
+        hedger: BaseHedger | None = None,
+    ) -> StrategyStatistics:
+        return self.run(
             feature_processor=feature_processor,
             strategy=strategy,
-            baseline_strategy=baseline_strategy,
-            data=self.test_data,
-            returns=self.test_returns,
-            factors=self.test_factors,
-            rf=self.test_rf,
             hedger=hedger,
         )
 
-    def plot_returns_histogram(
-        self,
-        start_date: pd.Timestamp | None = None,
-        end_date: pd.Timestamp | None = None,
-    ) -> None:
+    def plot_returns_histogram(self, start_date: pd.Timestamp | None = None, end_date: pd.Timestamp | None = None) -> None:
         if start_date is None:
             start_date = self.strategy_total_r.index.min()
 
@@ -245,27 +205,12 @@ class Runner:
             strategy_total=self.strategy_total_r.loc[start_date:end_date],
         )
 
-    def plot_returns_histogram_vs_baseline(
-        self,
-        start_date: pd.Timestamp | None = None,
-        end_date: pd.Timestamp | None = None,
-    ) -> None:
-        if start_date is None:
-            start_date = self.strategy_total_r.index.min()
-
-        if end_date is None:
-            end_date = self.strategy_total_r.index.max()
-
-        plot_histogram_vs_baseline(
-            strategy_total=self.strategy_total_r.loc[start_date:end_date],
-            baseline=self.baseline_total_r.loc[start_date:end_date],
-        )
-
     def plot_cumulative(
         self,
         start_date: pd.Timestamp | None = None,
         end_date: pd.Timestamp | None = None,
         include_factors: bool = False,  # noqa: FBT001, FBT002
+        strategy_name: str | None = None,
     ) -> None:
         if start_date is None:
             start_date = self.strategy_total_r.index.min()
@@ -275,18 +220,13 @@ class Runner:
 
         plot_cumulative_pnls(
             strategy_total=self.strategy_total_r.loc[start_date:end_date],
-            baseline=self.baseline_total_r.loc[start_date:end_date],
-            buy_hold=self.factors_total_r.loc[start_date:end_date]
-            if include_factors
-            else None,
-            plot_log=False,
+            buy_hold=self.factors.add(self.rf, axis=0).loc[start_date:end_date] if include_factors else None,
+            plot_log=True,
+            name_strategy=strategy_name if strategy_name is not None else "Strategy",
+            mkt_name=self.experiment_config.MKT_NAME,
         )
 
-    def plot_turnover(
-        self,
-        start_date: pd.Timestamp | None = None,
-        end_date: pd.Timestamp | None = None,
-    ) -> None:
+    def plot_turnover(self, start_date: pd.Timestamp | None = None, end_date: pd.Timestamp | None = None) -> None:
         if start_date is None:
             start_date = self.strategy_total_r.index.min()
 
@@ -299,7 +239,8 @@ class Runner:
         self,
         start_date: pd.Timestamp | None = None,
         end_date: pd.Timestamp | None = None,
-    ):
+        mkt_only: bool = False,  # noqa: FBT001, FBT002
+    ) -> None:
         if start_date is None:
             start_date = self.strategy_total_r.index.min()
 
@@ -307,19 +248,38 @@ class Runner:
             end_date = self.strategy_total_r.index.max()
 
         strategy_total_r = self.strategy_total_r.loc[start_date:end_date]
-        baseline_total_r = self.baseline_total_r.loc[start_date:end_date]
-        dates = strategy_total_r.index
+        factors = self.factors.loc[start_date:end_date].add(self.rf.loc[start_date:end_date], axis=0)
 
-        strategy_total_r = strategy_total_r.to_numpy().flatten()
-        baseline_total_r = baseline_total_r.to_numpy().flatten()
+        if mkt_only:
+            plot_outperformance(
+                strategy_total=strategy_total_r,
+                baseline=factors[self.experiment_config.MKT_NAME],
+                baseline_name=self.experiment_config.MKT_NAME,
+            )
+        else:
+            for factor_name in factors.columns:
+                plot_outperformance(
+                    strategy_total=strategy_total_r,
+                    baseline=factors[factor_name],
+                    baseline_name=factor_name,
+                )
 
-        outperform = strategy_total_r - baseline_total_r
-        outperform_rel = outperform / (1 + baseline_total_r)
+    def save(self, strategy_name: str) -> None:
+        if self.strategy_excess_r is None:
+            msg = "Strategy is not backtested yet!"
+            raise ValueError(msg)
 
-        plt.figure(figsize=(14, 8))
-        plt.plot(dates, np.log(1 + outperform_rel).cumsum())
+        filename = strategy_name + ".csv"
+        strategy_xs_r = self.strategy_excess_r.rename(columns={"excess_r": "strategy_xs_r"})
+        start, end = strategy_xs_r.index.min(), strategy_xs_r.index.max()
+        factors = self.strategy_backtester.factors.loc[start:end]
+        rf = self.strategy_backtester.rf.loc[start:end]
 
-        plt.xlabel("Date")
-        plt.ylabel("Outperformance")
+        rebal_bool = pd.Series(1, index=self.strategy_backtester.rebal_weights.index, name="rebal")
+        rebal_bool = rebal_bool.reindex(self.strategy_weights.index).fillna(0).astype(bool)
 
-        plt.show()
+        sample = strategy_xs_r.merge(factors, left_index=True, right_index=True)
+        sample = sample.merge(rf, left_index=True, right_index=True)
+        sample = sample.merge(rebal_bool, left_index=True, right_index=True)
+
+        sample.to_csv(self.experiment_config.SAVE_PATH / filename)

@@ -21,82 +21,61 @@ class TransactionCostCharger:
 
     @staticmethod
     def get_turnover(weights: pd.DataFrame, returns: pd.DataFrame) -> pd.Series:
-        n_assets = weights.shape[1]
+        period_end_weights = [np.zeros(weights.shape[1])]
+        last_rebal_date = weights.index[0]
+        for rebal in [*weights.index[1:-1], None]:
+            w0 = weights.loc[last_rebal_date]
+            end_date = rebal - pd.Timedelta(days=1) if rebal else None
+            ret_sample = returns.loc[last_rebal_date:end_date].copy().fillna(0)
+            ret_sample = ret_sample.prod(axis=0).to_numpy()
+            period_end_weights.append(w0 * (1 + ret_sample))
+            last_rebal_date = rebal
 
-        weights_all = np.concatenate([np.zeros((1, n_assets)), weights], axis=0)
-        returns_all = np.concatenate(
-            [np.zeros((1, n_assets)), returns.to_numpy()], axis=0
-        )
+        period_end_weights = np.array(period_end_weights)
 
-        period_end_weights = weights_all * (1 + returns_all)
+        turnover = np.abs(weights.to_numpy() - period_end_weights).sum(axis=1)
+        if len(weights) > 1:
+            turnover = pd.Series(turnover, index=weights.index, name="turnover", dtype=np.float64)
+        else:
+            turnover = pd.Series(turnover[:-1], index=weights.index, name="turnover", dtype=np.float64)
 
-        turnover = np.abs(weights.to_numpy() - period_end_weights[:-1]).sum(axis=1)
+        return turnover  # type: ignore[no-any-return]
 
-        return pd.Series(turnover, index=returns.index, name="turnover")
-
-    def _get_trading_costs(
-        self, weights: pd.DataFrame, returns: pd.DataFrame
-    ) -> pd.Series:
+    def _get_trading_costs(self, weights: pd.DataFrame, returns: pd.DataFrame) -> pd.Series:
         turnover = self.get_turnover(weights, returns)
         self._strategy_turnover = turnover
 
-        trading_costs = np.where(
-            turnover > 0,
-            turnover * self.trading_config.ask_commission,
-            np.abs(turnover) * self.trading_config.bid_commission,
-        )
-        trading_costs += (
-            self.trading_config.broker_fee + self.trading_config.bid_ask_spread / 2
-        ) * turnover
+        trading_costs = pd.Series(index=returns.index, name="trading_costs", dtype=np.float64)
+        # TODO(@V): Bid and Ask commission
+        tc = (self.trading_config.broker_fee + self.trading_config.bid_ask_spread / 2) * turnover
+        trading_costs.loc[tc.index] = tc
 
-        # Assume selling at final point fully, i.e. trading_costs[-2] = trading_costs[-1] + trading_costs[-2]
-        return pd.Series(trading_costs, index=turnover.index, name="trading_costs")
+        return trading_costs
 
     def _get_success_costs(self, returns: pd.DataFrame) -> pd.Series:
-        success_costs = pd.Series(
-            np.zeros(len(returns)), index=returns.index, name="success_costs"
-        )
-        success_costs.iloc[-1] = (
-            np.maximum(returns.add(1).prod().add(-1), 0)
-            * self.trading_config.success_fee
-        ).sum()
+        success_costs = pd.Series(np.zeros(len(returns)), index=returns.index, name="success_costs")
+        success_costs.iloc[-1] = (np.maximum(returns.add(1).prod().add(-1), 0) * self.trading_config.success_fee).sum()
         return success_costs
 
-    def _get_transaction_costs(
-        self, weights: pd.DataFrame, returns: pd.DataFrame
-    ) -> pd.Series:
+    def _get_transaction_costs(self, weights: pd.DataFrame, returns: pd.DataFrame) -> pd.Series:
         trading_costs = self._get_trading_costs(weights=weights, returns=returns)
         mf_costs = self._get_mf_costs(returns=returns)
         success_costs = self._get_success_costs(returns=returns)
 
-        costs = pd.merge_asof(
-            trading_costs,
-            mf_costs,
-            left_index=True,
-            right_index=True,
-            tolerance=pd.Timedelta("1D"),
-        )
-        costs = pd.merge_asof(
-            costs,
-            success_costs,
-            left_index=True,
-            right_index=True,
-            tolerance=pd.Timedelta("1D"),
-        )
+        costs = pd.merge_asof(trading_costs, mf_costs, left_index=True, right_index=True, tolerance=pd.Timedelta("1D"))
+        costs = pd.merge_asof(costs, success_costs, left_index=True, right_index=True, tolerance=pd.Timedelta("1D"))
 
         return costs.sum(axis=1)
 
     def _get_mf_costs(self, returns: pd.DataFrame) -> pd.Series:
-        # TODO(Viacheslav Buchkov): fix to mf_freq parameterizable
-        mf_costs = (
-            pd.Series(
-                np.zeros(returns.shape[0]), index=returns.index, name="management_fee"
-            )
-            .resample("YE")
-            .sum()
-        )
+        # TODO(V): fix to mf_freq parameterizable
+        mf_costs = pd.Series(np.zeros(returns.shape[0]), index=returns.index, name="management_fee").resample("YE").sum()
         mf_costs = mf_costs + self.trading_config.management_fee
         return mf_costs.add(1).cumprod().add(-1)
 
     def __call__(self, weights: pd.DataFrame, returns: pd.DataFrame) -> pd.Series:
         return self._get_transaction_costs(weights, returns)
+
+    @property
+    def turnover(self) -> pd.Series:
+        return self._strategy_turnover

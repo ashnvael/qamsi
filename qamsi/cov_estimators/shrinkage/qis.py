@@ -3,7 +3,9 @@ from __future__ import annotations
 import math
 import numpy as np
 import pandas as pd
+
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
+from qamsi.strategies.optimization_data import PredictionData, TrainingData
 
 
 def _QIS(Y,k=None):
@@ -84,14 +86,13 @@ class QISCovEstimator(BaseCovEstimator):
 
         self._obs_cov = None
 
-    def _fit(
-        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
-    ) -> None:
-        self._available_assets = list(targets.columns)
-        self._obs_cov = targets.cov()
+    def _fit(self, training_data: TrainingData) -> None:
+        ret = training_data.simple_excess_returns
+
+        self._obs_cov = ret.cov()
         cov = _QIS(self._obs_cov, self.k)
 
         self._fitted_cov = pd.DataFrame(cov, index=self._available_assets, columns=self._available_assets)
 
-    def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
+    def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
         return self._fitted_cov

@@ -3,16 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
+
+from qamsi.strategies.optimization_data import TrainingData, PredictionData
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
-
-
-def corr_matrix_from_cov(var_covar: np.ndarray) -> np.ndarray:
-    diag_inv = np.diag(1 / np.sqrt(np.diag(var_covar)))
-    return diag_inv @ var_covar @ diag_inv
-
-
-def var_covar_from_corr_array(corr_array: np.ndarray, volatilities: np.ndarray) -> np.ndarray:
-    return volatilities @ corr_array @ volatilities
+from qamsi.features.covar import var_covar_from_corr_array
 
 
 class PCACovEstimator(BaseCovEstimator):
@@ -28,13 +22,12 @@ class PCACovEstimator(BaseCovEstimator):
 
         self._pca = PCA()
 
-    def _fit(
-        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
-    ) -> None:
-        self._available_assets = list(targets.columns)
-        self._obs_cov = targets.cov()
-        self._fitted_vols = np.eye(targets.shape[1]) * targets.std().to_numpy()
-        corr = targets.corr().to_numpy()
+    def _fit(self, training_data: TrainingData) -> None:
+        ret = training_data.simple_excess_returns
+
+        self._obs_cov = ret.cov()
+        self._fitted_vols = np.eye(ret.shape[1]) * ret.std().to_numpy()
+        corr = ret.corr().to_numpy()
 
         self._pca.fit(corr)
 
@@ -48,7 +41,7 @@ class PCACovEstimator(BaseCovEstimator):
         np.fill_diagonal(self._fitted_corr, 1)
 
         cov = var_covar_from_corr_array(self._fitted_corr, self._fitted_vols)
-        self._fitted_cov = pd.DataFrame(cov, index=self._available_assets, columns=self._available_assets)
+        self._fitted_cov = pd.DataFrame(cov, index=self.available_assets, columns=self.available_assets)
 
-    def _predict(self, features: pd.DataFrame, factors: pd.DataFrame) -> pd.DataFrame:
+    def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
         return self._fitted_cov
