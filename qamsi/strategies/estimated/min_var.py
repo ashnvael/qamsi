@@ -50,9 +50,11 @@ class MinVariance(BaseStrategy):
             start_date:
         ]
 
-        training_data.log_excess_returns = training_data.log_excess_returns.loc[
-            start_date:, self.available_assets
-        ] if training_data.log_excess_returns is not None else None
+        training_data.log_excess_returns = (
+            training_data.log_excess_returns.loc[start_date:, self.available_assets]
+            if training_data.log_excess_returns is not None
+            else None
+        )
         training_data.targets = (
             training_data.targets.loc[start_date:, self.available_assets]
             if training_data.targets is not None

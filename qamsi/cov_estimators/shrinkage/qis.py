@@ -8,7 +8,7 @@ from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.strategies.optimization_data import PredictionData, TrainingData
 
 
-def _QIS(Y, h: float| None = None, k: float | None = None):
+def _QIS(Y, h: float | None = None, k: float | None = None):
     # Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
     #    None, np.nan or int
     # Post-Condition: Sigmahat dataframe is returned
