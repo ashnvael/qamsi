@@ -39,12 +39,10 @@ class FactorCovEstimator(BaseCovEstimator):
 
         factor_train_data = deepcopy(training_data)
         factor_train_data.simple_excess_returns = factors
-        factor_train_data.targets = None
         factor_train_data.log_excess_returns = None
 
         resid_train_data = deepcopy(training_data)
         resid_train_data.simple_excess_returns = self._residuals
-        resid_train_data.targets = None
         resid_train_data.log_excess_returns = None
 
         self.factor_cov_estimator.fit(factor_train_data)

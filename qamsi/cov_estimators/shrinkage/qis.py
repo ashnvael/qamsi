@@ -8,7 +8,7 @@ from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.strategies.optimization_data import PredictionData, TrainingData
 
 
-def _QIS(Y, k=None):
+def _QIS(Y, h: float| None = None, k: float | None = None):
     # Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
     #    None, np.nan or int
     # Post-Condition: Sigmahat dataframe is returned
@@ -42,7 +42,8 @@ def _QIS(Y, k=None):
     lambda1 = dfu.columns  # recapture sorted lambda
 
     # COMPUTE Quadratic-Inverse Shrinkage estimator of the covariance matrix
-    h = (min(c**2, 1 / c**2) ** 0.35) / p**0.35  # smoothing parameter
+    if h is None:
+        h = (min(c**2, 1 / c**2) ** 0.35) / p**0.35  # smoothing parameter
     invlambda = (
         1 / lambda1[max(1, p - n + 1) - 1 : p]
     )  # inverse of (non-null) eigenvalues
