@@ -75,6 +75,11 @@ class BaseExperimentConfig:
         metadata={"docs": "Tradeable factors tuple"},
     )
 
+    TARGETS: tuple[str] = field(
+        default=(),
+        metadata={"docs": "ML Targets"},
+    )
+
     HEDGING_ASSETS: tuple[str] = field(
         default=("spx_fut",),
         metadata={"docs": "Tradeable assets tuple"},

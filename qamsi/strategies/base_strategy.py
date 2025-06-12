@@ -44,11 +44,6 @@ class BaseStrategy(ABC):
             if training_data.log_excess_returns is not None
             else None
         )
-        training_data.targets = (
-            training_data.targets[available_stocks]
-            if training_data.targets is not None
-            else None
-        )
 
         self._fit(training_data=training_data)
 

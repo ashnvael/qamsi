@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from qamsi.backtest.transaction_costs_charger import TransactionCostCharger
@@ -21,6 +21,7 @@ class Backtester:
     def __init__(  # noqa: PLR0913, PLR0913, RUF100
         self,
         stocks_returns: Returns,
+        targets: pd.DataFrame,
         features: pd.DataFrame,
         prices: pd.DataFrame,
         mkt_caps: pd.DataFrame,
@@ -39,6 +40,7 @@ class Backtester:
 
         self.stocks_returns = stocks_returns
         self.features = features
+        self.targets = targets
         self.prices = prices
         self.mkt_caps = mkt_caps
         self.rf = rf
@@ -133,7 +135,10 @@ class Backtester:
         return ret_series.add(1).prod(axis=0).add(-1)
 
     def run(self, strategy: BaseStrategy, hedger: BaseHedger | None = None) -> None:
-        strategy_weights = self.get_strategy_weights(strategy)
+        strategy_weights = self.calc_rolling_weights(lambda pred_date: self.get_strategy_weights(strategy=strategy, pred_date=pred_date))
+        stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
+        strategy_weights = pd.DataFrame(strategy_weights, columns=stocks_columns).set_index("date")
+
         self._rebal_weights = strategy_weights
         stocks_total_r = self.stocks_returns.simple_returns
         float_w_normalized, strategy_unhedged_total_r = self.float_weights(
@@ -178,7 +183,95 @@ class Backtester:
         self._strategy_total_r = strategy_total_r
         self._strategy_excess_r = strategy_excess_r
 
-    def get_strategy_weights(self, strategy: BaseStrategy) -> pd.DataFrame:
+    def run_one_step(self, start_date: pd.Timestamp, end_date: pd.Timestamp, strategy: BaseStrategy, hedger: BaseHedger | None = None) -> pd.DataFrame:
+        # TODO(@V): Add hedger (!!!)
+        if hedger is not None:
+            msg = "Hedged one step is not supported yet!"
+            raise NotImplementedError(msg)
+
+        pred_date = start_date - BusinessDay(n=self.trading_lag)
+
+        weights = self.get_strategy_weights(
+            strategy=strategy, pred_date=pred_date
+        )
+        strategy_weights = [[start_date, *weights.flatten().tolist()]]
+        stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
+        strategy_weights = pd.DataFrame(strategy_weights, columns=stocks_columns).set_index("date")
+
+        stocks_total_r = self.stocks_returns.simple_returns
+        float_w_normalized, strategy_unhedged_total_r = self.float_weights(
+            total_returns=stocks_total_r,
+            weights=strategy_weights,
+            rf=self.rf,
+            add_total_r=None,
+        )
+
+        return strategy_unhedged_total_r.loc[:end_date]
+
+    def get_data(self, pred_date: pd.Timestamp) -> tuple[TrainingData, PredictionData]:
+        # Each slice => n - lag goes into training -> 1 last for predict
+        available_features = self.features.loc[:pred_date]
+        train_features = available_features.shift(1).iloc[1:]
+        pred_features = (available_features.iloc[-1]).to_frame().T
+
+        available_prices = self.prices.loc[:pred_date]
+        train_prices = available_prices.shift(1).iloc[1:]
+        pred_prices = (available_prices.iloc[-1]).to_frame().T
+
+        available_mkt_caps = self.mkt_caps.loc[:pred_date]
+        train_mkt_caps = available_mkt_caps.shift(1).iloc[1:]
+        pred_mkt_caps = (available_mkt_caps.iloc[-1]).to_frame().T
+
+        train_factors = self.factors.loc[:pred_date].iloc[1:]
+        train_targets = self.targets.loc[:pred_date].iloc[1:]
+        train_rf = self.rf.loc[:pred_date].iloc[1:]
+
+        simple_train_xs_r = (
+            self.stocks_returns.simple_returns.loc[:pred_date]
+            .iloc[1:]
+            .sub(train_rf, axis=0)
+        )
+        log_train_xs_r = (
+            self.stocks_returns.log_returns.loc[:pred_date]
+            .iloc[1:]
+            .sub(train_rf, axis=0)
+        )
+
+        training_data = TrainingData(
+            features=train_features,
+            targets=train_targets,
+            prices=train_prices,
+            market_cap=train_mkt_caps,
+            factors=train_factors,
+            simple_excess_returns=simple_train_xs_r,
+            log_excess_returns=log_train_xs_r,
+        )
+
+        prediction_data = PredictionData(
+            features=pred_features,
+            prices=pred_prices,
+            market_cap=pred_mkt_caps,
+        )
+
+        return training_data, prediction_data
+
+    def get_strategy_weights(
+        self, strategy: BaseStrategy, pred_date: pd.Timestamp
+    ) -> np.array:
+        training_data, prediction_data = self.get_data(pred_date)
+
+        # Whether the strategy has a memory or retrains from scratch is handled inside the strategy obj
+        strategy.fit(training_data=training_data)
+
+        weights = strategy(prediction_data=prediction_data)
+        weights = np.clip(
+            weights,
+            self.trading_config.min_exposure,
+            self.trading_config.max_exposure,
+        )
+        return weights.to_numpy()
+
+    def calc_rolling_weights(self, get_weights_fn: Callable[[pd.Timestamp], np.ndarray[float]]) -> list[np.ndarray]:
         rolling_weights = []
         last_rebal_date = None
         n_rebals = 0
@@ -209,75 +302,21 @@ class Backtester:
             if should_rebal:
                 pred_date = rebal_date - BusinessDay(n=self.trading_lag)
 
-                # Each slice => n - lag goes into training -> 1 last for predict
-                available_features = self.features.loc[:pred_date]
-                train_features = available_features.iloc[:-1]
-                pred_features = (available_features.iloc[-1]).to_frame().T
-
-                available_prices = self.prices.loc[:pred_date]
-                train_prices = available_prices.iloc[:-1]
-                pred_prices = (available_prices.iloc[-1]).to_frame().T
-
-                available_mkt_caps = self.mkt_caps.loc[:pred_date]
-                train_mkt_caps = available_mkt_caps.iloc[:-1]
-                pred_mkt_caps = (available_mkt_caps.iloc[-1]).to_frame().T
-
-                train_factors = self.factors.loc[:pred_date].iloc[1:]
-                train_rf = self.rf.loc[:pred_date].iloc[1:]
-
-                simple_train_xs_r = (
-                    self.stocks_returns.simple_returns.loc[:pred_date]
-                    .iloc[1:]
-                    .sub(train_rf, axis=0)
-                )
-                log_train_xs_r = (
-                    self.stocks_returns.log_returns.loc[:pred_date]
-                    .iloc[1:]
-                    .sub(train_rf, axis=0)
-                )
-
-                training_data = TrainingData(
-                    features=train_features,
-                    prices=train_prices,
-                    market_cap=train_mkt_caps,
-                    factors=train_factors,
-                    simple_excess_returns=simple_train_xs_r,
-                    log_excess_returns=log_train_xs_r,
-                )
-
-                prediction_data = PredictionData(
-                    features=pred_features,
-                    prices=pred_prices,
-                    market_cap=pred_mkt_caps,
-                )
-
-                # Whether the strategy has a memory or retrains from scratch is handled inside the strategy obj
-                strategy.fit(training_data=training_data)
-
-                weights = strategy(prediction_data=prediction_data)
-                weights = np.clip(
-                    weights,
-                    self.trading_config.min_exposure,
-                    self.trading_config.max_exposure,
-                )
+                weights = get_weights_fn(pred_date)
 
                 rolling_weights.append(
-                    [rebal_date, *weights.to_numpy().flatten().tolist()]
+                    [rebal_date, *weights.flatten().tolist()]
                 )
 
                 last_rebal_date = rebal_date
                 n_rebals += 1
 
-        stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
-        self._strategy_weights = pd.DataFrame(
-            rolling_weights, columns=stocks_columns
-        ).set_index("date")
-
-        return self._strategy_weights
+        return rolling_weights
 
     def get_hedger_weights(
         self, hedger: BaseHedger, strategy_weights: pd.DataFrame
     ) -> pd.DataFrame:
+        # TODO(@V): Deprecate and use calc_rolling_weights(lambda pred_date: get_hedger_weights(...))
         rolling_weights = []
         last_hedge_date = None
         n_hedges = 0

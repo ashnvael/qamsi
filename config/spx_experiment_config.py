@@ -139,6 +139,11 @@ class ExperimentConfig(BaseExperimentConfig):
         metadata={"docs": "Tradeable factors tuple"},
     )
 
+    TARGETS: tuple[str] = field(
+        default=("vol", "naive_vol", "l_shrinkage",),
+        metadata={"docs": "ML Targets"},
+    )
+
     RF_NAME: str = field(
         default="acc_rate",
         metadata={"docs": "Risk-Free rate column name"},

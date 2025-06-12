@@ -56,7 +56,7 @@ class MinVariance(BaseStrategy):
             else None
         )
         training_data.targets = (
-            training_data.targets.loc[start_date:, self.available_assets]
+            training_data.targets.loc[start_date:]
             if training_data.targets is not None
             else None
         )

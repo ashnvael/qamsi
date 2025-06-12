@@ -46,6 +46,11 @@ class Runner:
         self._prepare()
 
         self._is_hedged = None
+        self.strategy_backtester = None
+        self.strategy_total_r = None
+        self.strategy_excess_r = None
+        self.strategy_weights = None
+        self.strategy_turnover = None
 
     def _prepare(self) -> None:
         data_df = pd.read_csv(
@@ -93,6 +98,8 @@ class Runner:
         self.returns = Returns(self.data.loc[:, self.experiment_config.ASSET_UNIVERSE])
         self.rf = self.data[self.experiment_config.RF_NAME]
 
+        self.targets = self.data.loc[:, self.experiment_config.TARGETS]
+
         # Factors are passed as excess returns
         self.factors = self.data.loc[:, self.experiment_config.FACTORS]
 
@@ -105,6 +112,7 @@ class Runner:
             *market_cap_names,
             self.experiment_config.RF_NAME,
             *self.experiment_config.FACTORS,
+            *self.experiment_config.TARGETS,
             *self.experiment_config.HEDGING_ASSETS,
         ]
         self.features = self.data.drop(columns=exclude, errors="ignore")
@@ -115,23 +123,13 @@ class Runner:
     def available_features(self) -> list[str]:
         return self.features.columns.tolist()
 
-    def _run_backtest(  # noqa: PLR0913
-        self,
-        feature_processor: Preprocessor,
-        strategy: BaseStrategy,
-        features: pd.DataFrame,
-        returns: Returns,
-        rf: pd.Series,
-        factors: pd.DataFrame,
-        hedging_assets: pd.DataFrame | None = None,
-        hedger: BaseHedger | None = None,
-    ) -> StrategyStatistics:
+    def init_backtester(self, feature_processor: Preprocessor) -> Backtester:
         hedging_assets_ret = (
-            Returns(simple_returns=hedging_assets).truncate(
+            Returns(simple_returns=self.hedging_assets).truncate(
                 feature_processor.truncation_len
             )
-            if hedging_assets is not None
-            else hedging_assets
+            if self.hedging_assets is not None
+            else self.hedging_assets
         )
         hedge_freq = (
             self.experiment_config.HEDGE_FREQ
@@ -139,13 +137,14 @@ class Runner:
             else self.experiment_config.REBALANCE_FREQ
         )
 
-        backtester = Backtester(
-            stocks_returns=returns.truncate(feature_processor.truncation_len),
-            features=feature_processor(features),
+        return Backtester(
+            stocks_returns=self.returns.truncate(feature_processor.truncation_len),
+            features=feature_processor(self.features),
+            targets=self.targets.iloc[feature_processor.truncation_len :],
             prices=self.prices.iloc[feature_processor.truncation_len :],
             mkt_caps=self.mkt_caps.iloc[feature_processor.truncation_len :],
-            rf=rf.iloc[feature_processor.truncation_len :],
-            factors=factors.iloc[feature_processor.truncation_len :],
+            rf=self.rf.iloc[feature_processor.truncation_len :],
+            factors=self.factors.iloc[feature_processor.truncation_len :],
             tc_charger=self.tc_charger,
             trading_config=self.trading_config,
             n_lookback_periods=self.experiment_config.N_LOOKBEHIND_PERIODS,
@@ -155,9 +154,23 @@ class Runner:
             verbose=self.verbose,
             hedging_assets=hedging_assets_ret,
         )
-        backtester(strategy, hedger)
 
-        self.strategy_backtester = backtester
+    def run(
+        self,
+        feature_processor: Preprocessor,
+        strategy: BaseStrategy,
+        hedger: BaseHedger | None = None,
+    ) -> StrategyStatistics:
+        if hedger is None:
+            self._is_hedged = False
+        else:
+            self._is_hedged = True
+            hedger.market_name = self.experiment_config.MKT_NAME
+
+        self.strategy_backtester = self.init_backtester(
+            feature_processor=feature_processor
+        )
+        self.strategy_backtester(strategy, hedger)
 
         self.strategy_total_r = self.strategy_backtester.strategy_total_r
         self.strategy_excess_r = self.strategy_backtester.strategy_excess_r
@@ -175,26 +188,21 @@ class Runner:
 
         return assessor(self.strategy_total_r)
 
-    def run(
+    def run_one_step(
         self,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
         feature_processor: Preprocessor,
         strategy: BaseStrategy,
         hedger: BaseHedger | None = None,
-    ) -> StrategyStatistics:
-        if hedger is None:
-            self._is_hedged = False
-        else:
-            self._is_hedged = True
-            hedger.market_name = self.experiment_config.MKT_NAME
-
-        return self._run_backtest(
-            feature_processor=feature_processor,
+    ) -> pd.DataFrame:
+        self.strategy_backtester = self.init_backtester(
+            feature_processor=feature_processor
+        )
+        return self.strategy_backtester.run_one_step(
+            start_date=start_date,
+            end_date=end_date,
             strategy=strategy,
-            features=self.features,
-            returns=self.returns,
-            hedging_assets=self.hedging_assets,
-            rf=self.rf,
-            factors=self.factors,
             hedger=hedger,
         )
 

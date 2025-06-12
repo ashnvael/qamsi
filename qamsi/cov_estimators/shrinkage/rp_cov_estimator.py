@@ -12,10 +12,11 @@ from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 
 
 class RiskfolioCovEstimator(BaseCovEstimator):
-    def __init__(self, estimator_type: str = "hist") -> None:
+    def __init__(self, estimator_type: str = "hist", alpha: float = 0.1) -> None:
         super().__init__()
 
         self.estimator_type = estimator_type
+        self.alpha = alpha
 
         self._fitted_cov = None
 
@@ -27,7 +28,7 @@ class RiskfolioCovEstimator(BaseCovEstimator):
             ret,
             method=self.estimator_type,
             d=0.94,
-            alpha=0.1,
+            alpha=self.alpha,
             bWidth=0.01,
             detone=False,
             mkt_comp=1,
