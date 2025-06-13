@@ -1,402 +1,550 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-import matplotlib.pyplot as plt
-from IPython.display import clear_output
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from config.trading_config import TradingConfig
     from qamsi.backtest.transaction_costs_charger import TransactionCostCharger
     from qamsi.base.returns import Returns
-    from qamsi.hedge.hedger import Hedger
+    from qamsi.config.trading_config import TradingConfig
+    from qamsi.hedge.base_hedger import BaseHedger
     from qamsi.strategies.base_strategy import BaseStrategy
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.offsets import BusinessDay
 from tqdm import tqdm
+
+from qamsi.strategies.optimization_data import PredictionData, TrainingData
 
 
 class Backtester:
     def __init__(  # noqa: PLR0913, PLR0913, RUF100
         self,
         stocks_returns: Returns,
+        targets: pd.DataFrame,
         features: pd.DataFrame,
-        rf_rate: pd.DataFrame,
-        hedging_assets: pd.DataFrame,
+        prices: pd.DataFrame,
+        mkt_caps: pd.DataFrame,
+        rf: pd.Series,
+        factors: pd.DataFrame,
+        hedging_assets: Returns | None,
         tc_charger: TransactionCostCharger,
         trading_config: TradingConfig,
-        n_lookback_periods: int = 30 * 12,
-        min_rolling_periods: int | None = 12,
-        rebal_freq_days: int = 20,
+        n_lookback_periods: int,
+        min_rolling_periods: int | None,
+        rebal_freq: int | str | None,
+        hedge_freq: int | str | None,
+        causal_window_size: int | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
-        plot: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         super().__init__()
 
         self.stocks_returns = stocks_returns
         self.features = features
-        self.rf_rate = rf_rate
+        self.targets = targets
+        self.prices = prices
+        self.mkt_caps = mkt_caps
+        self.rf = rf
+        self.factors = factors
         self.hedging_assets = hedging_assets
         self.tc_charger = tc_charger
         self.trading_config = trading_config
+        self.trading_lag = trading_config.trading_lag_days
         self.n_lookback_periods = n_lookback_periods
         self.min_rolling_periods = (
             n_lookback_periods if min_rolling_periods is None else min_rolling_periods
         )
-        self.rebal_freq_days = rebal_freq_days
+        self.rebal_freq = rebal_freq
+        self.hedge_freq = hedge_freq
+        self.causal_window_size = causal_window_size
         self.verbose = verbose
-        self.plot = plot
 
-        self._stocks_total_r = None
-        self._stocks_excess_r = None
-
-        self._acc_rf = None
-        self._acc_factors = None
         self._strategy_total_r = None
+        self._strategy_unhedged_total_r = None
         self._strategy_excess_r = None
         self._strategy_weights = None
-        self._hedge_weights = None
-        self._trailing_betas = None
-        self._strategy_turnover = None
+        self._strategy_transac_costs = None
 
-        self._rolling_tuples = None
+        self._rebal_weights = None
+        self._first_rebal_date = None
+
+        self._hedge_weights = None
+        self._hedge_rebal_weights = None
+        self._hedge_total_r = None
+        self._hedge_excess_r = None
+
+        self._rolling_strategy_tuples = None
+        self._rolling_hedge_tuples = None
 
         self._prepare()
 
-    def __call__(self, strategy: BaseStrategy, hedger: Hedger | None = None) -> None:
+    def __call__(
+        self, strategy: BaseStrategy, hedger: BaseHedger | None = None
+    ) -> None:
         self.run(strategy, hedger)
 
-    def run(self, strategy: BaseStrategy, hedger: Hedger | None = None) -> None:  # noqa: PLR0915
-        rolling_dates = []
-        rolling_stocks_total_r = []
-        rolling_stocks_xs_r = []
-        rolling_acc_rf = []
-        rolling_factors = []
-        rolling_weights = []
-        rolling_hedge_weights = []
-        rolling_betas = []
-        rolling_turnover = []
-        previous_weights = pd.DataFrame(
-            np.zeros((1, self.stocks_returns.simple_returns.shape[1]))
-        )
-        last_rebal_date = None
+    def generate_rebal_schedule(self, freq: int | str | None) -> pd.DatetimeIndex:
+        if freq is None:
+            schedule = self.features.index
+        elif isinstance(freq, str):
+            date_index = self.features.index
+            schedule = (
+                self.features.groupby(date_index.to_period(freq.rstrip("E")))
+                .tail(1)
+                .index
+            )
+        elif isinstance(freq, int):
+            date_index = self.features.index
+            generated_dates = pd.date_range(
+                start=date_index.min(), end=date_index.max(), freq=f"{freq}D"
+            )
 
-        if self.verbose and not self.plot:
-            print("Running backtest...")
-            self._rolling_tuples = tqdm(self._rolling_tuples)
+            closest_dates_indices = date_index.get_indexer(
+                generated_dates, method="nearest"
+            )
 
-        i = 0
-        for iter_tuple in self._rolling_tuples:
-            (
-                rolling_features,
-                rolling_simple_r,
-                rolling_log_r,
-                rolling_hedge_simple_r,
-                rolling_hedge_log_r,
-                rolling_rf,
-            ) = iter_tuple
-
-            current_date = rolling_simple_r.index[-1]
-
-            if last_rebal_date is None:
-                rebal = True
-            else:
-                rebal = (
-                    current_date - last_rebal_date
-                ).days >= self.rebal_freq_days + self.trading_config.trading_days_lag
-            if rebal:
-                # Each slice => n - 1 goes into training -> 1 last for predict
-                train_features = rolling_features.iloc[:-1]
-                pred_features = (rolling_features.iloc[-1]).to_frame().T
-
-                train_factors = (
-                    rolling_hedge_log_r.iloc[:-1] - rolling_rf.iloc[:-1].to_numpy()
-                )
-                pred_factors = (
-                    (rolling_hedge_log_r.iloc[-1] - rolling_rf.iloc[-1].to_numpy())
-                    .to_frame()
-                    .T
-                )
-
-                train_xs_r = rolling_log_r.iloc[:-1] - rolling_rf.iloc[:-1].to_numpy()
-
-                if last_rebal_date is not None:
-                    start_date = last_rebal_date + pd.Timedelta(days=1)
-                    agg_stocks_total_r = rolling_simple_r.loc[start_date:current_date]
-                    agg_stocks_total_r = agg_stocks_total_r.fillna(0)
-                    agg_stocks_total_r = agg_stocks_total_r.add(1).prod(axis=0).add(-1).to_numpy()
-
-                    agg_rf = rolling_rf.loc[start_date:current_date].add(1).prod().add(-1).to_numpy().item()
-                    agg_stocks_xs_r = agg_stocks_total_r - agg_rf
-                    agg_hedge_total_r = (
-                        rolling_hedge_simple_r.loc[start_date:current_date].add(1).prod(axis=0).add(-1).to_numpy()
-                    )
-                    agg_hedge_xs_r = agg_hedge_total_r - agg_rf
-
-                    rolling_stocks_total_r.append(
-                        [current_date, *agg_stocks_total_r.tolist()]
-                    )
-                    rolling_stocks_xs_r.append(
-                        [current_date, *agg_stocks_xs_r.tolist()]
-                    )
-                    rolling_acc_rf.append([current_date, agg_rf])
-                    rolling_factors.append([current_date, *agg_hedge_xs_r.tolist()])
-
-                # Whether the strategy has a memory or retrains from scratch is handled inside the strategy obj
-                # Still pass all targets, not only tradeable, as can provide info for the strategy
-                strategy.fit(
-                    features=train_features, factors=train_factors, targets=train_xs_r
-                )
-                weights = strategy(features=pred_features, factors=pred_factors)
-
-                weights = np.minimum(weights, self.trading_config.max_exposure)
-                weights = np.maximum(weights, self.trading_config.min_exposure)
-
-                if hedger is not None and self.hedging_assets is not None:
-                    hedger.fit(
-                        features=train_features,
-                        targets=train_xs_r,
-                        rf_rate=rolling_rf.iloc[:-1].to_numpy(),
-                        hedge_assets=rolling_hedge_simple_r.iloc[:-1],
-                    )
-                    hedge_weights = hedger(features=pred_features, weights=weights)
-                    rolling_hedge_weights.append(
-                        [current_date, *hedge_weights.to_numpy().flatten().tolist()]
-                    )
-
-                    if hasattr(hedger, "betas"):
-                        rolling_betas.append(
-                            [current_date, *hedger.betas.to_numpy().flatten().tolist()]
-                        )
-
-                rolling_dates.append(current_date)
-                rolling_weights.append(
-                    [current_date, *weights.to_numpy().flatten().tolist()]
-                )
-                rolling_turnover.append(
-                    [current_date]
-                    + np.abs(weights - previous_weights.to_numpy())
-                    .to_numpy()
-                    .tolist()[0]
-                )
-
-                if self.plot and i != 0 and i % 20 == 0:
-                    self._plot_progress(
-                        dates=np.array(rolling_stocks_xs_r)[:, 0].tolist(),
-                        rolling_weights=np.array(rolling_weights)[:-1, 1:],
-                        rolling_hedge_weights=np.array(rolling_hedge_weights)[:-1, 1:]
-                        if len(rolling_hedge_weights) > 0
-                        else None,
-                        stocks_excess_r=np.array(rolling_stocks_xs_r)[:, 1:],
-                        factors_excess_r=np.array(rolling_factors)[:, 1:],
-                        rf_rate=np.array(rolling_acc_rf)[:, 1:].flatten(),
-                    )
-
-                previous_weights = weights
-                last_rebal_date = current_date
-                i += 1
-
-        rolling_weights = rolling_weights[:-1]
-        rolling_turnover = rolling_turnover[:-1]
-        if len(rolling_hedge_weights) > 0:
-            rolling_hedge_weights = rolling_hedge_weights[:-1]
-
-        stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
-        hedge_columns = ["date", *list(self.hedging_assets.simple_returns.columns)]
-        self._stocks_total_r = pd.DataFrame(
-            rolling_stocks_total_r, columns=stocks_columns
-        ).set_index("date")
-        self._stocks_excess_r = pd.DataFrame(
-            rolling_stocks_xs_r, columns=stocks_columns
-        ).set_index("date")
-        self._acc_factors = pd.DataFrame(
-            rolling_factors, columns=hedge_columns
-        ).set_index("date")
-        self._hedge_weights = pd.DataFrame(
-            rolling_hedge_weights, columns=hedge_columns
-        ).set_index("date")
-        self._trailing_betas = pd.DataFrame(
-            rolling_betas, columns=stocks_columns
-        ).set_index("date")
-        self._acc_rf = pd.DataFrame(rolling_acc_rf, columns=["date", "rf"]).set_index(
-            "date"
-        )
-
-        self._strategy_weights = pd.DataFrame(
-            rolling_weights, columns=stocks_columns
-        ).set_index("date")
-        self._strategy_turnover = pd.DataFrame(
-            rolling_turnover, columns=stocks_columns
-        ).set_index("date")
-
-        strategy_excess_r = (
-            self._strategy_weights.to_numpy() * self._stocks_excess_r.to_numpy()
-        ).sum(axis=1)
-
-        if len(rolling_hedge_weights) > 0:
-            self._hedge_weights = pd.DataFrame(
-                rolling_hedge_weights, columns=hedge_columns
-            ).set_index("date")
-            hedge_excess_r = (
-                self._hedge_weights.to_numpy() * self._acc_factors.to_numpy()
-            ).sum(axis=1)
-            strategy_excess_r = strategy_excess_r + hedge_excess_r
-
-        self._strategy_excess_r = pd.DataFrame(strategy_excess_r, columns=["excess_r"])
-        self._strategy_excess_r["date"] = self._stocks_total_r.index
-        self._strategy_excess_r = self._strategy_excess_r.set_index("date")
-
-        strategy_transac_costs = self.tc_charger(
-            weights=self._strategy_weights, returns=self._stocks_total_r
-        )
-        self._strategy_excess_r = (
-            self._strategy_excess_r - strategy_transac_costs.to_numpy()[:, np.newaxis]
-        )
-
-        self._strategy_total_r = self._strategy_excess_r + self._acc_rf.to_numpy()
-        self._strategy_total_r = self._strategy_total_r.rename(
-            columns={"excess_r": "total_r"}
-        )
-
-    @staticmethod
-    def _plot_progress(
-        rolling_weights: np.ndarray,
-        stocks_excess_r: np.ndarray,
-        factors_excess_r: np.ndarray,
-        rf_rate: np.ndarray,
-        rolling_hedge_weights: np.ndarray | None = None,
-        dates: list[pd.Timestamp] | None = None,
-    ) -> None:
-        clear_output()
-
-        dates = np.arange(1, len(rf_rate) + 1) if dates is None else dates
-
-        unhedged_strategy_excess_r = (rolling_weights * stocks_excess_r).sum(axis=1)
-
-        # Chart 1 - NAV
-        if rolling_hedge_weights is not None:
-            fig, axs = plt.subplots(1, 3, figsize=(20, 8))
-
-            hedge_excess_r = (rolling_hedge_weights * factors_excess_r).sum(axis=1)
-            hedged_strategy_excess_r = unhedged_strategy_excess_r + hedge_excess_r
-
-            hedged_strategy_total_r = hedged_strategy_excess_r + rf_rate
-            axs[0].plot(dates, np.cumprod(1 + hedged_strategy_total_r), label="Hedged")
-
-            # Chart 2 - Hedging weights
-            axs[2].plot(dates, rolling_hedge_weights)
-
-            axs[2].set_xlabel("Date")
-            axs[2].set_ylabel("Hedge Weights")
+            schedule = date_index[closest_dates_indices]
         else:
-            fig, axs = plt.subplots(1, 2, figsize=(12, 20))
+            msg = f"Unknown rebalancing frequency type: {freq}."
+            raise NotImplementedError(msg)
 
-        unhedged_strategy_total_r = unhedged_strategy_excess_r + rf_rate
-        axs[0].plot(dates, np.cumprod(1 + unhedged_strategy_total_r), label="Unhedged")
+        if self.min_rolling_periods is not None:
+            for i, date in enumerate(schedule):
+                n_points = self.features.loc[:date].shape[0]
+                if n_points >= self.min_rolling_periods:
+                    schedule = schedule[i:]
+                    break
 
-        factor_total_r = np.mean(factors_excess_r, axis=1) + rf_rate
-        axs[0].plot(dates, np.cumprod(1 + factor_total_r), label="EW Factors")
+        if freq is None:
+            schedule = schedule[:1]
 
-        axs[0].set_xlabel("Date")
-        axs[0].set_ylabel("Total NAV")
-        axs[0].legend()
-
-        # Chart 3 - Outperformance
-        sim_rel = (
-            unhedged_strategy_excess_r.flatten() - factors_excess_r.flatten()
-        ) / (1 + factors_excess_r.flatten())
-        axs[1].plot(dates, np.log(1 + sim_rel.astype(float)).cumsum())
-
-        axs[1].set_xlabel("Date")
-        axs[1].set_ylabel("Outperformance")
-
-        plt.show()
+        return schedule
 
     def _prepare(self) -> None:
-        rolling_features = self.get_rolling_arrays(data_df=self.features)
+        self.rebal_schedule = self.generate_rebal_schedule(freq=self.rebal_freq)
+        self.hedge_schedule = self.generate_rebal_schedule(freq=self.hedge_freq)
 
-        rolling_simple_r = self.get_rolling_arrays(
-            data_df=self.stocks_returns.simple_returns
+        if self.verbose:
+            print(f"Num Train Iterations: {len(self.rebal_schedule)}")  # noqa: T201
+
+    @staticmethod
+    def _accrue_returns(
+        simple_returns: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp
+    ) -> pd.Series:
+        """Accrues simple returns from start_date to end_date (end date is included!)."""
+        ret_series = simple_returns.loc[start_date:end_date]
+        ret_series = ret_series.fillna(0)
+        return ret_series.add(1).prod(axis=0).add(-1)
+
+    def run(self, strategy: BaseStrategy, hedger: BaseHedger | None = None) -> None:
+        strategy_weights = self.calc_rolling_weights(
+            lambda pred_date: self.get_strategy_weights(
+                strategy=strategy, pred_date=pred_date
+            )
         )
-        rolling_log_r = self.get_rolling_arrays(data_df=self.stocks_returns.log_returns)
+        stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
+        strategy_weights = pd.DataFrame(
+            strategy_weights, columns=stocks_columns
+        ).set_index("date")
 
-        rolling_rf = self.get_rolling_arrays(data_df=self.rf_rate)
+        self._rebal_weights = strategy_weights
+        stocks_total_r = self.stocks_returns.simple_returns
+        float_w_normalized, strategy_unhedged_total_r = self.float_weights(
+            total_returns=stocks_total_r,
+            weights=strategy_weights,
+            rf=self.rf,
+            add_total_r=None,
+        )
+        self._strategy_unhedged_total_r = strategy_unhedged_total_r
+        start_date = strategy_unhedged_total_r.index.min()
+        rf = self.rf.loc[start_date:]
 
-        if self.hedging_assets is not None:
-            rolling_hedge_simple_r = self.get_rolling_arrays(
-                data_df=self.hedging_assets.simple_returns
-            )
-            rolling_hedge_log_r = self.get_rolling_arrays(
-                data_df=self.hedging_assets.log_returns
-            )
+        if hedger is not None:
+            if self.verbose:
+                print(f"Num Hedge Iterations: {len(self.hedge_schedule)}")  # noqa: T201
 
-            self._rolling_tuples = zip(
-                rolling_features,
-                rolling_simple_r,
-                rolling_log_r,
-                rolling_hedge_simple_r,
-                rolling_hedge_log_r,
-                rolling_rf,
-                strict=False,
+            hedger_weights = self.get_hedger_weights(hedger, float_w_normalized)
+            hedge_float_w, strategy_hedged_total_r = self.float_weights(
+                total_returns=self.hedging_assets.simple_returns.add(self.rf, axis=0),
+                weights=hedger_weights,
+                rf=self.rf,
+                add_total_r=strategy_unhedged_total_r,
             )
+            strategy_total_r = strategy_hedged_total_r
+
+            self._hedge_weights = hedge_float_w
         else:
-            self._rolling_tuples = zip(
-                rolling_features,
-                rolling_simple_r,
-                rolling_log_r,
-                rolling_rf,
-                strict=False,
-            )
+            strategy_total_r = strategy_unhedged_total_r
 
-    def get_rolling_arrays(self, data_df: pd.DataFrame) -> list[pd.DataFrame]:
-        # TODO @V: Expanding or not
-        # TODO @V: start not from Test start, but predict on Test start with further lookbehind back
-        rolling_windows = data_df.rolling(
-            self.n_lookback_periods + 1, min_periods=self.min_rolling_periods + 1
+        self._strategy_weights = float_w_normalized
+
+        strategy_transac_costs = self.tc_charger(
+            weights=strategy_weights, returns=stocks_total_r.loc[start_date:]
         )
-        return [
-            window
-            for window in rolling_windows
-            if not window.empty and window.shape[0] >= self.min_rolling_periods + 1
-        ]
+        strategy_total_r = strategy_total_r.sub(strategy_transac_costs, axis=0)
+
+        strategy_excess_r = strategy_total_r.sub(rf, axis=0).rename(
+            columns={"total_r": "excess_r"},
+        )
+
+        self._strategy_transac_costs = strategy_transac_costs
+        self._strategy_total_r = strategy_total_r
+        self._strategy_excess_r = strategy_excess_r
+
+    def run_one_step(
+        self,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
+        strategy: BaseStrategy,
+        hedger: BaseHedger | None = None,
+    ) -> pd.DataFrame:
+        # TODO(@V): Add hedger (!!!)
+        if hedger is not None:
+            msg = "Hedged one step is not supported yet!"
+            raise NotImplementedError(msg)
+
+        pred_date = start_date - BusinessDay(n=self.trading_lag)
+
+        weights = self.get_strategy_weights(strategy=strategy, pred_date=pred_date)
+        strategy_weights = [[start_date, *weights.flatten().tolist()]]
+        stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
+        strategy_weights = pd.DataFrame(
+            strategy_weights, columns=stocks_columns
+        ).set_index("date")
+
+        stocks_total_r = self.stocks_returns.simple_returns.loc[:end_date]
+        float_w_normalized, strategy_unhedged_total_r = self.float_weights(
+            total_returns=stocks_total_r,
+            weights=strategy_weights,
+            rf=self.rf.loc[:end_date],
+            add_total_r=None,
+        )
+
+        return strategy_unhedged_total_r
+
+    def get_data(self, pred_date: pd.Timestamp) -> tuple[TrainingData, PredictionData]:
+        # Each slice => n - lag goes into training -> 1 last for predict
+        available_features = self.features.loc[:pred_date]
+        train_features = available_features.shift(1).iloc[1:]
+        pred_features = (available_features.iloc[-1]).to_frame().T
+
+        available_prices = self.prices.loc[:pred_date]
+        train_prices = available_prices.shift(1).iloc[1:]
+        pred_prices = (available_prices.iloc[-1]).to_frame().T
+
+        available_mkt_caps = self.mkt_caps.loc[:pred_date]
+        train_mkt_caps = available_mkt_caps.shift(1).iloc[1:]
+        pred_mkt_caps = (available_mkt_caps.iloc[-1]).to_frame().T
+
+        train_factors = self.factors.loc[:pred_date].iloc[1:]
+        train_targets = self.targets.loc[:pred_date]
+        train_targets = (
+            train_targets.iloc[1 : -self.causal_window_size]
+            if self.causal_window_size is not None
+            else train_targets.iloc[1:]
+        )
+        train_rf = self.rf.loc[:pred_date].iloc[1:]
+
+        simple_train_xs_r = (
+            self.stocks_returns.simple_returns.loc[:pred_date]
+            .iloc[1:]
+            .sub(train_rf, axis=0)
+        )
+        log_train_xs_r = (
+            self.stocks_returns.log_returns.loc[:pred_date]
+            .iloc[1:]
+            .sub(train_rf, axis=0)
+        )
+
+        training_data = TrainingData(
+            features=train_features,
+            targets=train_targets,
+            prices=train_prices,
+            market_cap=train_mkt_caps,
+            factors=train_factors,
+            simple_excess_returns=simple_train_xs_r,
+            log_excess_returns=log_train_xs_r,
+        )
+
+        prediction_data = PredictionData(
+            features=pred_features,
+            prices=pred_prices,
+            market_cap=pred_mkt_caps,
+        )
+
+        return training_data, prediction_data
+
+    def get_strategy_weights(
+        self, strategy: BaseStrategy, pred_date: pd.Timestamp
+    ) -> np.array:
+        training_data, prediction_data = self.get_data(pred_date)
+
+        # Whether the strategy has a memory or retrains from scratch is handled inside the strategy obj
+        strategy.fit(training_data=training_data)
+
+        weights = strategy(prediction_data=prediction_data)
+        weights = np.clip(
+            weights,
+            self.trading_config.min_exposure,
+            self.trading_config.max_exposure,
+        )
+        return weights.to_numpy()
+
+    def calc_rolling_weights(
+        self, get_weights_fn: Callable[[pd.Timestamp], np.ndarray[float]]
+    ) -> list[np.ndarray]:
+        rolling_weights = []
+        last_rebal_date = None
+        n_rebals = 0
+        for rebal_date in tqdm(
+            self.rebal_schedule, desc="Computing Weights", disable=not self.verbose
+        ):
+            if last_rebal_date is None:
+                self._first_rebal_date = rebal_date
+
+            if self.rebal_freq is None:
+                should_rebal = last_rebal_date is None
+            elif isinstance(self.rebal_freq, int | float):
+                if last_rebal_date is None:
+                    should_rebal = True
+                else:
+                    n_days_change = (
+                        (rebal_date - last_rebal_date).days
+                        if last_rebal_date is not None
+                        else 0
+                    )
+                    should_rebal = n_days_change >= self.rebal_freq
+            elif isinstance(self.rebal_freq, str):
+                should_rebal = rebal_date >= self.rebal_schedule[n_rebals]
+            else:
+                msg = f"Unknown rebalancing frequency type: {self.rebal_freq}."
+                raise NotImplementedError(msg)
+
+            if should_rebal:
+                pred_date = rebal_date - BusinessDay(n=self.trading_lag)
+
+                weights = get_weights_fn(pred_date)
+
+                rolling_weights.append([rebal_date, *weights.flatten().tolist()])
+
+                last_rebal_date = rebal_date
+                n_rebals += 1
+
+        return rolling_weights
+
+    def get_hedger_weights(
+        self, hedger: BaseHedger, strategy_weights: pd.DataFrame
+    ) -> pd.DataFrame:
+        # TODO(@V): Deprecate and use calc_rolling_weights(lambda pred_date: get_hedger_weights(...))
+        rolling_weights = []
+        last_hedge_date = None
+        n_hedges = 0
+        for rebal_date in tqdm(
+            self.hedge_schedule, desc="Hedging", disable=not self.verbose
+        ):
+            if rebal_date < self._first_rebal_date:
+                should_hedge = False
+            elif self.hedge_freq is None:
+                should_hedge = last_hedge_date is None
+            elif isinstance(self.hedge_freq, int | float):
+                if last_hedge_date is None:
+                    should_hedge = True
+                else:
+                    n_days_change = (
+                        (rebal_date - last_hedge_date).days
+                        if last_hedge_date is not None
+                        else 0
+                    )
+                    should_hedge = n_days_change >= self.hedge_freq
+            elif isinstance(self.hedge_freq, str):
+                should_hedge = rebal_date == self.rebal_schedule[n_hedges]
+            else:
+                msg = f"Unknown hedging frequency type: {self.hedge_freq}."
+                raise NotImplementedError(msg)
+
+            if should_hedge:
+                period_end_weights = strategy_weights.loc[rebal_date].copy()
+                picked_assets = period_end_weights[period_end_weights != 0].index
+
+                pred_date = rebal_date - BusinessDay(n=self.trading_lag)
+
+                # Each slice => n - lag goes into training -> 1 last for predict
+                available_features = self.features.loc[:pred_date]
+                train_features = available_features.iloc[:-1]
+                pred_features = (available_features.iloc[-1]).to_frame().T
+
+                available_prices = self.prices.loc[:pred_date]
+                train_prices = available_prices.iloc[:-1]
+                pred_prices = (available_prices.iloc[-1]).to_frame().T
+
+                available_mkt_caps = self.mkt_caps.loc[:pred_date]
+                train_mkt_caps = available_mkt_caps.iloc[:-1]
+                pred_mkt_caps = (available_mkt_caps.iloc[-1]).to_frame().T
+
+                train_factors = self.factors.loc[:pred_date].iloc[1:]
+                train_rf = self.rf.loc[:pred_date].iloc[1:]
+
+                simple_train_xs_r = (
+                    self.stocks_returns.simple_returns.loc[:pred_date]
+                    .iloc[1:]
+                    .sub(train_rf, axis=0)
+                )
+                log_train_xs_r = (
+                    self.stocks_returns.log_returns.loc[:pred_date]
+                    .iloc[1:]
+                    .sub(train_rf, axis=0)
+                )
+
+                train_hedging_assets_r = self.hedging_assets.simple_returns.loc[
+                    :pred_date
+                ].iloc[1:]
+
+                training_data = TrainingData(
+                    features=train_features,
+                    prices=train_prices[picked_assets]
+                    if len(train_prices) > 0
+                    else train_prices,
+                    market_cap=train_mkt_caps[picked_assets]
+                    if len(train_mkt_caps) > 0
+                    else train_mkt_caps,
+                    factors=train_factors,
+                    simple_excess_returns=simple_train_xs_r[picked_assets],
+                    log_excess_returns=log_train_xs_r[picked_assets],
+                )
+
+                prediction_data = PredictionData(
+                    features=pred_features,
+                    prices=pred_prices[picked_assets]
+                    if len(pred_prices) > 0
+                    else pred_prices,
+                    market_cap=pred_mkt_caps[picked_assets]
+                    if len(pred_mkt_caps) > 0
+                    else pred_mkt_caps,
+                )
+
+                hedger.fit(
+                    training_data=training_data,
+                    hedge_assets=train_hedging_assets_r,
+                )
+                hedge_weights = hedger(
+                    prediction_data=prediction_data,
+                    asset_weights=period_end_weights.loc[picked_assets],
+                )
+
+                rolling_weights.append(
+                    [rebal_date, *hedge_weights.to_numpy().flatten().tolist()]
+                )
+
+                last_hedge_date = rebal_date
+                n_hedges += 1
+
+        hedge_columns = ["date", *list(self.hedging_assets.simple_returns.columns)]
+        self._hedge_rebal_weights = pd.DataFrame(
+            rolling_weights, columns=hedge_columns
+        ).set_index("date")
+
+        return self._hedge_rebal_weights
+
+    @staticmethod
+    def float_weights(
+        total_returns: pd.DataFrame,
+        weights: pd.DataFrame,
+        rf: pd.Series,
+        add_total_r: pd.DataFrame | None = None,
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        total_r = pd.DataFrame(
+            index=total_returns.index, columns=["total_r"], dtype=np.float64
+        )
+        level_data = pd.DataFrame(
+            index=total_returns.index, columns=["level_data"], dtype=np.float64
+        )
+        float_weights = pd.DataFrame(
+            index=total_returns.index, columns=[*total_returns.columns.tolist()]
+        )
+
+        total_returns = (
+            pd.concat([total_returns, rf], axis=1)
+            if add_total_r is None
+            else pd.concat([total_returns, add_total_r, rf], axis=1)
+        )
+        n_auxilary_cols = 1 if add_total_r is None else 2
+        weights = weights.copy()
+        if add_total_r is not None:
+            weights["add"] = 1
+        weights["rf"] = 1 - weights.sum(axis=1)
+
+        last_rebal_date = weights.index[0]
+
+        total_r = total_r.loc[last_rebal_date:]
+        float_weights = float_weights.loc[last_rebal_date:]
+        level_data = level_data.loc[last_rebal_date:]
+
+        total_r.loc[last_rebal_date] = np.float64(0.0)
+        float_weights.loc[last_rebal_date] = np.float64(0.0)
+        for rebal in [*weights.index[1:].tolist(), None]:
+            w0 = weights.loc[last_rebal_date]
+            start_date = last_rebal_date
+            end_date = rebal if rebal else None
+
+            sample_r = total_returns.loc[start_date:end_date].copy().fillna(0)
+            r_mat = 1 + sample_r
+            r_mat.iloc[0] = w0.fillna(0)
+            float_w = r_mat.cumprod(axis=0).fillna(0)
+
+            level = float_w.sum(axis=1)
+
+            ret_tmp = level.pct_change(1).iloc[1:]
+
+            total_r.loc[ret_tmp.index] = ret_tmp.to_frame()
+            # TODO(@V): Check .div() by level for long-short
+            normalized = float_w.iloc[:, :-n_auxilary_cols].div(level, axis=0)
+            float_weights.loc[sample_r.index, :] = normalized
+            level_data.loc[level.index] = level.to_frame()
+
+            last_rebal_date = rebal
+
+        return float_weights, total_r
 
     @property
-    def total_returns(self) -> pd.Series:
+    def strategy_total_r(self) -> pd.Series:
         return self._strategy_total_r
 
     @property
-    def stocks_total_r(self) -> pd.DataFrame:
-        return self._stocks_total_r
+    def strategy_unhedged_total_r(self) -> pd.Series:
+        return self._strategy_unhedged_total_r
 
     @property
-    def stocks_excess_r(self) -> pd.DataFrame:
-        return self._stocks_excess_r
-
-    @property
-    def acc_rf_rate(self) -> pd.DataFrame:
-        return self._acc_rf
-
-    @property
-    def acc_factors(self) -> pd.DataFrame:
-        return self._acc_factors
-
-    @property
-    def excess_returns(self) -> pd.Series:
+    def strategy_excess_r(self) -> pd.Series:
         return self._strategy_excess_r
 
     @property
-    def weights(self) -> pd.DataFrame:
+    def strategy_weights(self) -> pd.DataFrame:
         return self._strategy_weights
 
     @property
+    def rebal_weights(self) -> pd.DataFrame:
+        return self._rebal_weights
+
+    @property
+    def strategy_transaction_costs(self) -> pd.DataFrame:
+        return self._strategy_transac_costs
+
+    @property
+    def hedge_total_r(self) -> pd.Series:
+        return self._hedge_total_r
+
+    @property
+    def hedge_excess_r(self) -> pd.Series:
+        return self._hedge_excess_r
+
+    @property
     def turnover(self) -> pd.Series:
-        return self._strategy_turnover.sum(axis=1)
+        return self.tc_charger.turnover
 
     @property
     def hedge_weights(self) -> pd.DataFrame:
         return self._hedge_weights
 
     @property
-    def trailing_betas(self) -> pd.DataFrame:
-        return self._trailing_betas
+    def hedge_rebal_weights(self) -> pd.DataFrame:
+        return self._hedge_rebal_weights

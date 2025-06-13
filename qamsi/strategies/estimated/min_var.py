@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from qamsi.strategies.optimization_data import PredictionData, TrainingData
+
 import pandas as pd
 
-from config.trading_config import TradingConfig
+from qamsi.config.trading_config import TradingConfig
 from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.optimization.constraints import Constraints
 from qamsi.optimization.optimization import VarianceMinimizer
@@ -10,30 +15,55 @@ from qamsi.strategies.base_strategy import BaseStrategy
 
 
 class MinVariance(BaseStrategy):
+    PERCENTAGE_VALID_POINTS = 1.0
+
     def __init__(
         self,
         cov_estimator: BaseCovEstimator,
         trading_config: TradingConfig,
-        rebalance_mode: str = "fully",
+        window_size: int,
     ) -> None:
-        super().__init__(rebalance_mode=rebalance_mode)
+        super().__init__()
 
         self.cov_estimator = cov_estimator
         self.trading_config = trading_config
+        self.window_size = window_size
 
-    def _fit(
-        self, features: pd.DataFrame, factors: pd.DataFrame, targets: pd.DataFrame
-    ) -> None:
-        available_hist_stocks = set(
-            targets.loc[:, ~targets.isna().any()].columns.tolist()
-        )
-        self.available_assets = list(set(self.available_assets) & available_hist_stocks)
+    def _fit(self, training_data: TrainingData) -> None:
+        ret = training_data.simple_excess_returns[self.available_assets]
 
-        self.cov_estimator.fit(
-            features=features,
-            factors=factors,
-            targets=targets[self.available_assets],
+        start_date = ret.index[-1] - pd.Timedelta(days=self.window_size)
+        ret = ret.loc[start_date:]
+
+        n_valid_points = (~ret.isna()).sum(axis=0) / len(ret)
+        valid_stocks = list(
+            n_valid_points[n_valid_points >= self.PERCENTAGE_VALID_POINTS].index
         )
+
+        self.available_assets = valid_stocks
+        self.cov_estimator.available_assets = self.available_assets
+
+        training_data.simple_excess_returns = training_data.simple_excess_returns[
+            self.available_assets
+        ]
+        training_data.simple_excess_returns = training_data.simple_excess_returns.loc[
+            start_date:
+        ]
+
+        training_data.log_excess_returns = (
+            training_data.log_excess_returns.loc[start_date:, self.available_assets]
+            if training_data.log_excess_returns is not None
+            else None
+        )
+        training_data.targets = (
+            training_data.targets.loc[start_date:]
+            if training_data.targets is not None
+            else None
+        )
+        training_data.features = training_data.features.loc[start_date:]
+        training_data.factors = training_data.factors.loc[start_date:]
+
+        self.cov_estimator.fit(training_data)
 
     def _optimize(self, covmat: pd.DataFrame) -> pd.Series[float]:
         constraints = Constraints(ids=self.available_assets)
@@ -52,15 +82,12 @@ class MinVariance(BaseStrategy):
         return pd.Series(self.var_min.results["weights"])
 
     def _get_weights(
-        self, features: pd.DataFrame, factors: pd.DataFrame
+        self, prediction_data: PredictionData, weights_: pd.DataFrame
     ) -> pd.DataFrame:
-        covmat = self.cov_estimator.predict(features, factors)
+        covmat = self.cov_estimator.predict(prediction_data)
         weights = self._optimize(covmat)
 
-        weights_df = pd.DataFrame(
-            0.0, index=[features.index[-1]], columns=self.all_assets
-        )
-        weights_df.loc[:, weights.index] = weights.to_numpy()
+        weights_.loc[:, weights.index] = weights.to_numpy()
 
         # (!!!) Please, use only excess returns to apply this scaling correctly
-        return weights_df
+        return weights_

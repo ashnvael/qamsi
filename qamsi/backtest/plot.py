@@ -12,48 +12,49 @@ import numpy as np
 
 def plot_cumulative_pnls(
     strategy_total: pd.Series,
-    baseline: pd.Series,
     buy_hold: pd.Series | None = None,
     *,
     plot_log: bool = False,
+    name_strategy: str = "Strategy",
+    mkt_name: str = "spx",
 ) -> None:
     plt.figure(figsize=(14, 8))
 
+    strategy_total = strategy_total.copy()
+    buy_hold = buy_hold.copy() if buy_hold is not None else None
+
     strategy_total.iloc[0, :] = np.zeros((1, strategy_total.shape[1]))
-    baseline.iloc[0, :] = np.zeros((1, baseline.shape[1]))
     if buy_hold is not None:
         buy_hold.iloc[0, :] = np.zeros((1, buy_hold.shape[1]))
 
     strategy_cumulative = strategy_total.add(1).cumprod()
-    baseline_cumulative = baseline.add(1).cumprod()
+    strategy = strategy_cumulative.to_numpy()
 
-    strategy = (
-        np.log(strategy_cumulative.to_numpy())
-        if plot_log
-        else strategy_cumulative.to_numpy()
-    )
-    baseline = (
-        np.log(baseline_cumulative.to_numpy())
-        if plot_log
-        else baseline_cumulative.to_numpy()
-    )
-
-    plt.plot(strategy_cumulative.index, strategy, label="Strategy")
-    plt.plot(baseline_cumulative.index, baseline, label="Baseline")
+    plt.plot(strategy_cumulative.index, strategy, label=name_strategy)
 
     if buy_hold is not None:
         buy_hold_cumulative = buy_hold.add(1).cumprod()
-        for col in buy_hold.columns:
-            buy_hold_series = (
-                np.log(buy_hold_cumulative[col].to_numpy())
-                if plot_log
-                else buy_hold_cumulative[col].to_numpy()
-            )
-            plt.plot(buy_hold_cumulative.index, buy_hold_series, label=col)
+        if mkt_name in buy_hold.columns:
+            market = buy_hold_cumulative[mkt_name]
+            buy_hold_cumulative = buy_hold_cumulative.drop(columns=mkt_name)
+            plt.plot(market.index, market.to_numpy(), label=mkt_name, linewidth=6)
+        plt.plot(
+            buy_hold_cumulative.index,
+            buy_hold_cumulative.to_numpy(),
+            label=buy_hold_cumulative.columns,
+            linestyle="--",
+        )
+        plt.legend(
+            fontsize=16,
+            loc="upper left",
+            bbox_to_anchor=(1.05, 1),
+            borderaxespad=0.0,
+        )
 
     plt.xlabel("Date", fontsize=14)
     if plot_log:
-        plt.ylabel("Log Cumulative Pnl", fontsize=14)
+        plt.ylabel("Log Scale Cumulative Pnl", fontsize=14)
+        plt.yscale("log")
     else:
         plt.ylabel("Cumulative Pnl", fontsize=14)
     plt.legend(fontsize=16)
@@ -74,8 +75,14 @@ def plot_weights(weights: pd.DataFrame) -> None:
 
 def plot_turnover(turnover: pd.Series) -> None:
     plt.figure(figsize=(14, 8))
+    dates = turnover.index
+    turnover = turnover.copy().to_numpy()
 
-    plt.plot(turnover.index, turnover, label="Strategy Turnover")
+    rebal_turnober_idx = turnover != 0
+    turnover = turnover[rebal_turnober_idx]
+    dates = dates[rebal_turnober_idx]
+
+    plt.plot(dates, turnover, label="Strategy Turnover")
     plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(1))
 
     plt.xlabel("Date", fontsize=14)
@@ -96,15 +103,24 @@ def plot_histogram(
     plt.show()
 
 
-def plot_histogram_vs_baseline(
+def plot_outperformance(
     strategy_total: pd.Series,
     baseline: pd.Series,
+    baseline_name: str = "Baseline",
 ) -> None:
+    dates = strategy_total.index
+
+    strategy_total_r = strategy_total.to_numpy().flatten()
+    baseline_total_r = baseline.to_numpy().flatten()
+
+    outperform = strategy_total_r - baseline_total_r
+    outperform_rel = outperform / (1 + baseline_total_r)
+
     plt.figure(figsize=(14, 8))
+    plt.plot(dates, np.log(1 + outperform_rel).cumsum())
 
-    plt.hist(strategy_total, bins=50, alpha=0.5, label="Strategy Returns")
-    plt.hist(baseline, bins=50, alpha=0.5, label="Baseline Returns")
+    plt.xlabel("Date")
+    plt.ylabel("Outperformance")
+    plt.title(f"Outperformance vs {baseline_name}")
 
-    plt.ylabel("Return", fontsize=14)
-    plt.legend(fontsize=16, loc="upper right")
     plt.show()
