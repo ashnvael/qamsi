@@ -1,19 +1,25 @@
-#%%
 from __future__ import annotations
 
-#%%
 import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF
+from scipy.optimize import fmin_l_bfgs_b, minimize
+
 from qamsi.config.trading_config import TradingConfig
 from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
 from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
 from run import Dataset
-#%%
-REBAL_FREQ = "ME"
+
+from memory_profiler import profile
+
+REBAL_FREQ = 21
 DATASET = Dataset.SPX_US
 ESTIMATION_WINDOW = 365 * 1
-#%%
+
 experiment_config = DATASET.value()
 
 stocks = tuple(
@@ -24,6 +30,7 @@ stocks = tuple(
 )
 experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
 
+experiment_config.START_DATE = "1980-01-01"
 experiment_config.MIN_ROLLING_PERIODS = ESTIMATION_WINDOW + 1
 experiment_config.N_LOOKBEHIND_PERIODS = None
 experiment_config.REBALANCE_FREQ = REBAL_FREQ
@@ -46,8 +53,6 @@ preprocessor = Preprocessor(
 )
 
 trading_config = TradingConfig(
-    broker_fee=0.05 / 100,
-    bid_ask_spread=0.03 / 100,
     total_exposure=1,
     max_exposure=1,
     min_exposure=0,
@@ -59,24 +64,15 @@ runner = Runner(
     trading_config=trading_config,
     verbose=False,
 )
-#%%
-import numpy as np
 
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF
-from scipy.optimize import fmin_l_bfgs_b, minimize
 
-class ShrinkageGP:
+class ShrinkageGPOOS:
     def __init__(
         self,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
         max_shrinkage: float = 1,
         max_iterations: int = 10,
         acq_beta: float = 1.96,
     ) -> None:
-        self.start = start
-        self.end = end
         self.acq_beta = acq_beta
         self._domain_ra = (0, max_shrinkage)
         self.max_iterations = max_iterations
@@ -92,7 +88,8 @@ class ShrinkageGP:
             random_state=12,
         )
 
-    def optimize(self, ra: float) -> float:
+    @profile
+    def optimize(self, ra: float, start: pd.Timestamp, end: pd.Timestamp,) -> float:
         estimator = CovEstimators.RISKFOLIO.value(
             alpha=ra,
             estimator_type="shrunk",
@@ -105,11 +102,12 @@ class ShrinkageGP:
         )
 
         fitted_r = runner.run_one_step(
-            start_date=self.start,
-            end_date=self.end,
+            start_date=start,
+            end_date=end,
             feature_processor=preprocessor,
             strategy=strategy,
         )
+
         return -fitted_r.std().item()
 
     def next_recommendation(self) -> np.ndarray:
@@ -167,50 +165,46 @@ class ShrinkageGP:
         result = minimize(objective, x0=ra_init, bounds=[self._domain_ra])
         ra_opt = result.x.item()
 
-        sharpe = self.optimize(ra_opt)
-        self.optimal_sharpe = sharpe
-
         return ra_opt
 
-    def solve(self) -> float:
-        return self._run_search(self.max_iterations)
 
-    def __call__(self):
-        return self.solve()
+@profile
+def train():
+    available_dates = runner.returns.simple_returns.iloc[252:278].index
 
-    def _run_search(self, max_iter: int) -> float:
-        for _ in range(max_iter):
-            ra = self.next_recommendation()
+    last_date = available_dates[-1]
 
-            sharpe = self.optimize(ra)
+    optimal = []
+    i = 0
+    opt = ShrinkageGPOOS()
+    for date in tqdm(available_dates):
+        start_date = date
+        end_date = runner.returns.simple_returns.loc[start_date:].iloc[20:].index[0]
 
-            self.add_data_point(ra, sharpe)
+        if end_date > last_date:
+            break
 
-        ra_opt = self.get_solution()
+        ra = opt.next_recommendation()
 
-        return ra_opt
+        sharpe = opt.optimize(ra, start_date, end_date)
 
-import gc
+        opt.add_data_point(ra, sharpe)
 
-available_dates = runner.returns.simple_returns.loc["2014-11-03":].index
+        ra_opt = opt.get_solution()
 
-optimal = []
-for i, date in enumerate(available_dates):
-    start_date = date
-    end_date = runner.returns.simple_returns.loc[start_date:].iloc[20:].index[0]
+        optimal.append([end_date, ra_opt])
 
-    opt = ShrinkageGP(
-        start=start_date,
-        end=end_date,
+        if i % 20 == 0:
+            optimal_df = pd.DataFrame(optimal, columns=["end_date", "shrinkage"]).set_index("end_date")
+            optimal_df.to_csv("gp_ucb.csv", index=True, header=True)
+
+        i += 1
+
+    optimal_df = pd.DataFrame(optimal, columns=["end_date", "shrinkage"]).set_index(
+        "end_date"
     )
-    opt_ra = opt()
-    print(f"Date: {start_date}, Volatility: {-opt.optimal_sharpe * np.sqrt(252):.6f}, Naive Volatility: {-opt.optimize(0.1) * np.sqrt(252):.6f}, Shrinkage: {opt_ra:.2f}")
+    optimal_df.to_csv("gp_ucb.csv", index=True, header=True)
 
-    optimal.append([start_date, -opt.optimal_sharpe, -opt.optimize(0.1), opt_ra])
 
-    if i % 20 == 0:
-        optimal_df = pd.DataFrame(optimal, columns=["date", "vol", "naive_vol", "shrinkage"]).set_index("date")
-        optimal_df.to_csv("targets.csv", index=True, header=True)
-
-    gc.collect()
-    del opt
+if __name__ == "__main__":
+    train()

@@ -10,9 +10,6 @@ from qamsi.config.experiment_config import BaseExperimentConfig
 @dataclass
 class ExperimentConfig(BaseExperimentConfig):
     # Strategy Settings
-    FRACTIONAL_DIFFERENCING: float = field(
-        default=0.5, metadata={"docs": "Fractional Difference Order"}
-    )
 
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
@@ -87,7 +84,7 @@ class ExperimentConfig(BaseExperimentConfig):
 
     # Experiment Settings
     START_DATE: pd.Timestamp = field(
-        default=pd.to_datetime("2000-02-08"),
+        default=pd.to_datetime("1999-12-18"),
         metadata={"docs": "Date to start training"},
     )
 
@@ -121,6 +118,13 @@ class ExperimentConfig(BaseExperimentConfig):
     MIN_ROLLING_PERIODS: int = field(
         default=252,
         metadata={"docs": "Number of minimum rebalance periods to run the strategy"},
+    )
+
+    CAUSAL_WINDOW_SIZE: int | None = field(
+        default=21,
+        metadata={
+            "docs": "Number of datapoints that are not available at rebalancing"
+        },
     )
 
     # Universe Setting

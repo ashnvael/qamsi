@@ -89,8 +89,9 @@ def _QIS(Y, h: float | None = None, k: float | None = None):
 
 
 class QISCovEstimator(BaseCovEstimator):
-    def __init__(self, k: int | None = None) -> None:
+    def __init__(self, h: int | None = None, k: int | None = None) -> None:
         super().__init__()
+        self.h = h
         self.k = k
 
         self._fitted_vols = None
@@ -103,7 +104,7 @@ class QISCovEstimator(BaseCovEstimator):
         ret = training_data.simple_excess_returns
 
         self._obs_cov = ret.cov()
-        cov = _QIS(self._obs_cov, self.k)
+        cov = _QIS(self._obs_cov, self.h, self.k)
 
         self._fitted_cov = pd.DataFrame(
             cov, index=self._available_assets, columns=self._available_assets

@@ -2,16 +2,22 @@ from enum import Enum
 
 from qamsi.cov_estimators.heuristic.hist_cov_estimator import HistoricalCovEstimator
 from qamsi.cov_estimators.factor.factor_cov_estimator import FactorCovEstimator
-from qamsi.cov_estimators.ml.predictors.sklearn_ml_predictor import SklearnMlPredictor
+
 from qamsi.cov_estimators.shrinkage.diag_hist_cov_estimator import (
     DiagHistoricalCovEstimator,
 )
 from qamsi.cov_estimators.shrinkage.pca_cov_estimator import PCACovEstimator
 from qamsi.cov_estimators.shrinkage.qis import QISCovEstimator
 from qamsi.cov_estimators.shrinkage.rp_cov_estimator import RiskfolioCovEstimator
+
+from qamsi.cov_estimators.ml.predictors.sklearn_ml_predictor import SklearnMlPredictor
 from qamsi.cov_estimators.ml.glasso_estimator import GLassoCovEstimator
 from qamsi.cov_estimators.ml.glasso_tscv_estimator import GLassoTSCVCovEstimator
+
+from qamsi.cov_estimators.rl.ma_linear_estimator import MALinearCovEstimator
 from qamsi.cov_estimators.rl.dnk_linear_estimator import DNKLinearCovEstimator
+from qamsi.cov_estimators.rl.gpr_linear_estimator import GPRLinearCovEstimator
+from qamsi.cov_estimators.rl.uncert_ensemble_estimator import UncertEnsembleCovEstimator
 
 
 class CovEstimators(Enum):
@@ -29,4 +35,7 @@ class CovEstimators(Enum):
     GLASSO = GLassoCovEstimator
     GLASSO_TSCV = GLassoTSCVCovEstimator
 
+    MA = MALinearCovEstimator
     DNK = DNKLinearCovEstimator
+    GPR = GPRLinearCovEstimator
+    UNCERT_ENSEMBLE = UncertEnsembleCovEstimator

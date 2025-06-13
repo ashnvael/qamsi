@@ -64,6 +64,13 @@ class BaseExperimentConfig:
         metadata={"docs": "Number of minimum rebalance periods to run the strategy"},
     )
 
+    CAUSAL_WINDOW_SIZE: int | None = field(
+        default=None,
+        metadata={
+            "docs": "Number of datapoints that are not available at rebalancing"
+        },
+    )
+
     # Universe Setting
     ASSET_UNIVERSE: tuple[str] = field(
         default=("MOEX_INDEX",),

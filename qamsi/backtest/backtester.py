@@ -34,6 +34,7 @@ class Backtester:
         min_rolling_periods: int | None,
         rebal_freq: int | str | None,
         hedge_freq: int | str | None,
+        causal_window_size: int | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         super().__init__()
@@ -55,6 +56,7 @@ class Backtester:
         )
         self.rebal_freq = rebal_freq
         self.hedge_freq = hedge_freq
+        self.causal_window_size = causal_window_size
         self.verbose = verbose
 
         self._strategy_total_r = None
@@ -198,15 +200,15 @@ class Backtester:
         stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
         strategy_weights = pd.DataFrame(strategy_weights, columns=stocks_columns).set_index("date")
 
-        stocks_total_r = self.stocks_returns.simple_returns
+        stocks_total_r = self.stocks_returns.simple_returns.loc[:end_date]
         float_w_normalized, strategy_unhedged_total_r = self.float_weights(
             total_returns=stocks_total_r,
             weights=strategy_weights,
-            rf=self.rf,
+            rf=self.rf.loc[:end_date],
             add_total_r=None,
         )
 
-        return strategy_unhedged_total_r.loc[:end_date]
+        return strategy_unhedged_total_r
 
     def get_data(self, pred_date: pd.Timestamp) -> tuple[TrainingData, PredictionData]:
         # Each slice => n - lag goes into training -> 1 last for predict
@@ -223,7 +225,8 @@ class Backtester:
         pred_mkt_caps = (available_mkt_caps.iloc[-1]).to_frame().T
 
         train_factors = self.factors.loc[:pred_date].iloc[1:]
-        train_targets = self.targets.loc[:pred_date].iloc[1:]
+        train_targets = self.targets.loc[:pred_date]
+        train_targets = train_targets.iloc[1:-self.causal_window_size] if self.causal_window_size is not None else train_targets.iloc[1:]
         train_rf = self.rf.loc[:pred_date].iloc[1:]
 
         simple_train_xs_r = (

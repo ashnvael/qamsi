@@ -98,13 +98,13 @@ class Runner:
         self.returns = Returns(self.data.loc[:, self.experiment_config.ASSET_UNIVERSE])
         self.rf = self.data[self.experiment_config.RF_NAME]
 
-        self.targets = self.data.loc[:, self.experiment_config.TARGETS]
+        self.targets = self.data.loc[:, self.experiment_config.TARGETS] if self.data.columns.isin(self.experiment_config.TARGETS).any() else pd.DataFrame(index=self.data.index)
 
         # Factors are passed as excess returns
         self.factors = self.data.loc[:, self.experiment_config.FACTORS]
 
         # Hedging assets are passed as excess returns
-        self.hedging_assets = self.data.loc[:, self.experiment_config.HEDGING_ASSETS]
+        self.hedging_assets = self.data.loc[:, self.experiment_config.HEDGING_ASSETS] if self.data.columns.isin(self.experiment_config.HEDGING_ASSETS).any() else pd.DataFrame(index=self.data.index)
 
         exclude = [
             *self.experiment_config.ASSET_UNIVERSE,
@@ -151,6 +151,7 @@ class Runner:
             min_rolling_periods=self.experiment_config.MIN_ROLLING_PERIODS,
             rebal_freq=self.experiment_config.REBALANCE_FREQ,
             hedge_freq=hedge_freq,
+            causal_window_size=self.experiment_config.CAUSAL_WINDOW_SIZE,
             verbose=self.verbose,
             hedging_assets=hedging_assets_ret,
         )
