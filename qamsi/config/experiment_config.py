@@ -66,9 +66,7 @@ class BaseExperimentConfig:
 
     CAUSAL_WINDOW_SIZE: int | None = field(
         default=None,
-        metadata={
-            "docs": "Number of datapoints that are not available at rebalancing"
-        },
+        metadata={"docs": "Number of datapoints that are not available at rebalancing"},
     )
 
     # Universe Setting

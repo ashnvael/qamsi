@@ -137,9 +137,15 @@ class Backtester:
         return ret_series.add(1).prod(axis=0).add(-1)
 
     def run(self, strategy: BaseStrategy, hedger: BaseHedger | None = None) -> None:
-        strategy_weights = self.calc_rolling_weights(lambda pred_date: self.get_strategy_weights(strategy=strategy, pred_date=pred_date))
+        strategy_weights = self.calc_rolling_weights(
+            lambda pred_date: self.get_strategy_weights(
+                strategy=strategy, pred_date=pred_date
+            )
+        )
         stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
-        strategy_weights = pd.DataFrame(strategy_weights, columns=stocks_columns).set_index("date")
+        strategy_weights = pd.DataFrame(
+            strategy_weights, columns=stocks_columns
+        ).set_index("date")
 
         self._rebal_weights = strategy_weights
         stocks_total_r = self.stocks_returns.simple_returns
@@ -185,7 +191,13 @@ class Backtester:
         self._strategy_total_r = strategy_total_r
         self._strategy_excess_r = strategy_excess_r
 
-    def run_one_step(self, start_date: pd.Timestamp, end_date: pd.Timestamp, strategy: BaseStrategy, hedger: BaseHedger | None = None) -> pd.DataFrame:
+    def run_one_step(
+        self,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
+        strategy: BaseStrategy,
+        hedger: BaseHedger | None = None,
+    ) -> pd.DataFrame:
         # TODO(@V): Add hedger (!!!)
         if hedger is not None:
             msg = "Hedged one step is not supported yet!"
@@ -193,12 +205,12 @@ class Backtester:
 
         pred_date = start_date - BusinessDay(n=self.trading_lag)
 
-        weights = self.get_strategy_weights(
-            strategy=strategy, pred_date=pred_date
-        )
+        weights = self.get_strategy_weights(strategy=strategy, pred_date=pred_date)
         strategy_weights = [[start_date, *weights.flatten().tolist()]]
         stocks_columns = ["date", *list(self.stocks_returns.simple_returns.columns)]
-        strategy_weights = pd.DataFrame(strategy_weights, columns=stocks_columns).set_index("date")
+        strategy_weights = pd.DataFrame(
+            strategy_weights, columns=stocks_columns
+        ).set_index("date")
 
         stocks_total_r = self.stocks_returns.simple_returns.loc[:end_date]
         float_w_normalized, strategy_unhedged_total_r = self.float_weights(
@@ -226,7 +238,11 @@ class Backtester:
 
         train_factors = self.factors.loc[:pred_date].iloc[1:]
         train_targets = self.targets.loc[:pred_date]
-        train_targets = train_targets.iloc[1:-self.causal_window_size] if self.causal_window_size is not None else train_targets.iloc[1:]
+        train_targets = (
+            train_targets.iloc[1 : -self.causal_window_size]
+            if self.causal_window_size is not None
+            else train_targets.iloc[1:]
+        )
         train_rf = self.rf.loc[:pred_date].iloc[1:]
 
         simple_train_xs_r = (
@@ -274,7 +290,9 @@ class Backtester:
         )
         return weights.to_numpy()
 
-    def calc_rolling_weights(self, get_weights_fn: Callable[[pd.Timestamp], np.ndarray[float]]) -> list[np.ndarray]:
+    def calc_rolling_weights(
+        self, get_weights_fn: Callable[[pd.Timestamp], np.ndarray[float]]
+    ) -> list[np.ndarray]:
         rolling_weights = []
         last_rebal_date = None
         n_rebals = 0
@@ -307,9 +325,7 @@ class Backtester:
 
                 weights = get_weights_fn(pred_date)
 
-                rolling_weights.append(
-                    [rebal_date, *weights.flatten().tolist()]
-                )
+                rolling_weights.append([rebal_date, *weights.flatten().tolist()])
 
                 last_rebal_date = rebal_date
                 n_rebals += 1

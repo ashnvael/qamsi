@@ -43,14 +43,14 @@ class Runner:
             trading_config=self.trading_config,
         )
 
-        self._prepare()
-
         self._is_hedged = None
         self.strategy_backtester = None
         self.strategy_total_r = None
         self.strategy_excess_r = None
         self.strategy_weights = None
         self.strategy_turnover = None
+
+        self._prepare()
 
     def _prepare(self) -> None:
         data_df = pd.read_csv(
@@ -98,13 +98,21 @@ class Runner:
         self.returns = Returns(self.data.loc[:, self.experiment_config.ASSET_UNIVERSE])
         self.rf = self.data[self.experiment_config.RF_NAME]
 
-        self.targets = self.data.loc[:, self.experiment_config.TARGETS] if self.data.columns.isin(self.experiment_config.TARGETS).any() else pd.DataFrame(index=self.data.index)
+        self.targets = (
+            self.data.loc[:, self.experiment_config.TARGETS]
+            if self.data.columns.isin(self.experiment_config.TARGETS).any()
+            else pd.DataFrame(index=self.data.index)
+        )
 
         # Factors are passed as excess returns
         self.factors = self.data.loc[:, self.experiment_config.FACTORS]
 
         # Hedging assets are passed as excess returns
-        self.hedging_assets = self.data.loc[:, self.experiment_config.HEDGING_ASSETS] if self.data.columns.isin(self.experiment_config.HEDGING_ASSETS).any() else pd.DataFrame(index=self.data.index)
+        self.hedging_assets = (
+            self.data.loc[:, self.experiment_config.HEDGING_ASSETS]
+            if self.data.columns.isin(self.experiment_config.HEDGING_ASSETS).any()
+            else pd.DataFrame(index=self.data.index)
+        )
 
         exclude = [
             *self.experiment_config.ASSET_UNIVERSE,
@@ -117,17 +125,17 @@ class Runner:
         ]
         self.features = self.data.drop(columns=exclude, errors="ignore")
 
+        self.strategy_backtester = self.init_backtester()
+
         if self.verbose:
             print(f"Backtest on {self.data.index.min()} to {self.data.index.max()}")  # noqa: T201
 
     def available_features(self) -> list[str]:
         return self.features.columns.tolist()
 
-    def init_backtester(self, feature_processor: Preprocessor) -> Backtester:
+    def init_backtester(self) -> Backtester:
         hedging_assets_ret = (
-            Returns(simple_returns=self.hedging_assets).truncate(
-                feature_processor.truncation_len
-            )
+            Returns(simple_returns=self.hedging_assets)
             if self.hedging_assets is not None
             else self.hedging_assets
         )
@@ -138,13 +146,13 @@ class Runner:
         )
 
         return Backtester(
-            stocks_returns=self.returns.truncate(feature_processor.truncation_len),
-            features=feature_processor(self.features),
-            targets=self.targets.iloc[feature_processor.truncation_len :],
-            prices=self.prices.iloc[feature_processor.truncation_len :],
-            mkt_caps=self.mkt_caps.iloc[feature_processor.truncation_len :],
-            rf=self.rf.iloc[feature_processor.truncation_len :],
-            factors=self.factors.iloc[feature_processor.truncation_len :],
+            stocks_returns=self.returns,
+            features=self.features,
+            targets=self.targets,
+            prices=self.prices,
+            mkt_caps=self.mkt_caps,
+            rf=self.rf,
+            factors=self.factors,
             tc_charger=self.tc_charger,
             trading_config=self.trading_config,
             n_lookback_periods=self.experiment_config.N_LOOKBEHIND_PERIODS,
@@ -168,9 +176,6 @@ class Runner:
             self._is_hedged = True
             hedger.market_name = self.experiment_config.MKT_NAME
 
-        self.strategy_backtester = self.init_backtester(
-            feature_processor=feature_processor
-        )
         self.strategy_backtester(strategy, hedger)
 
         self.strategy_total_r = self.strategy_backtester.strategy_total_r
@@ -197,9 +202,6 @@ class Runner:
         strategy: BaseStrategy,
         hedger: BaseHedger | None = None,
     ) -> pd.DataFrame:
-        self.strategy_backtester = self.init_backtester(
-            feature_processor=feature_processor
-        )
         return self.strategy_backtester.run_one_step(
             start_date=start_date,
             end_date=end_date,

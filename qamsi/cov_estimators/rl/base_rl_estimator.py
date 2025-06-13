@@ -25,7 +25,7 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         elif self.shrinkage_type == ShrinkageType.LINEAR:
             super().__init__(
                 estimator_type="shrunk",
-                alpha=0.1, # Starting alpha, will be updated during fit
+                alpha=0.1,  # Starting alpha, will be updated during fit
             )
         else:
             msg = f"Unknown shrinkage type: {self.shrinkage_type}"
@@ -38,7 +38,9 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         self.trained_with_features = False
 
     @abstractmethod
-    def _fit_shrinkage(self, features: pd.DataFrame, shrinkage_target: pd.Series) -> None:
+    def _fit_shrinkage(
+        self, features: pd.DataFrame, shrinkage_target: pd.Series
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -57,7 +59,13 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
 
         feat = feat.loc[first_date:]
         if not last_pred.empty:
-            feat = pd.merge_asof(feat, last_pred, left_index=True, right_index=True, tolerance=pd.Timedelta("1D")).ffill()
+            feat = pd.merge_asof(
+                feat,
+                last_pred,
+                left_index=True,
+                right_index=True,
+                tolerance=pd.Timedelta("1D"),
+            ).ffill()
 
             if feat["prediction"].isna().any():
                 feat = feat.drop(["prediction"], axis=1)

@@ -14,7 +14,7 @@ from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
 class UncertEnsembleCovEstimator(BaseRLCovEstimator):
-    def __init__(self, shrinkage_type: str, kernel = DotProduct()) -> None:
+    def __init__(self, shrinkage_type: str, kernel=DotProduct()) -> None:
         super().__init__(shrinkage_type=shrinkage_type)
 
         self.gpr = GaussianProcessRegressor(

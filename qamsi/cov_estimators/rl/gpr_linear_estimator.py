@@ -14,7 +14,7 @@ from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
 class GPRLinearCovEstimator(BaseRLCovEstimator):
-    def __init__(self, shrinkage_type: str, kernel = DotProduct()) -> None:
+    def __init__(self, shrinkage_type: str, kernel=DotProduct()) -> None:
         super().__init__(shrinkage_type=shrinkage_type)
 
         self.gpr = GaussianProcessRegressor(
@@ -57,4 +57,3 @@ class GPRLinearCovEstimator(BaseRLCovEstimator):
             return pred
 
         return self.last_pred
-

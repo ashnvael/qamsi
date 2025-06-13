@@ -122,9 +122,7 @@ class ExperimentConfig(BaseExperimentConfig):
 
     CAUSAL_WINDOW_SIZE: int | None = field(
         default=21,
-        metadata={
-            "docs": "Number of datapoints that are not available at rebalancing"
-        },
+        metadata={"docs": "Number of datapoints that are not available at rebalancing"},
     )
 
     # Universe Setting
@@ -144,7 +142,11 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     TARGETS: tuple[str] = field(
-        default=("vol", "naive_vol", "l_shrinkage",),
+        default=(
+            "vol",
+            "naive_vol",
+            "l_shrinkage",
+        ),
         metadata={"docs": "ML Targets"},
     )
 

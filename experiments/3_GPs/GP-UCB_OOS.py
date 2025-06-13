@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF
+from sklearn.gaussian_process.kernels import RBF, DotProduct
 from scipy.optimize import fmin_l_bfgs_b, minimize
 
 from qamsi.config.trading_config import TradingConfig
@@ -65,6 +65,8 @@ runner = Runner(
 
 
 class ShrinkageGPOOS:
+    N_RECENT_POINTS: int = 21 * 6
+
     def __init__(
         self,
         max_shrinkage: float = 1,
@@ -81,12 +83,17 @@ class ShrinkageGPOOS:
         self.optimal_shrinkage = None
 
         self.gpr = GaussianProcessRegressor(
-            kernel=RBF(),
+            kernel=DotProduct(),
             n_restarts_optimizer=12,
             random_state=12,
         )
 
-    def optimize(self, ra: float, start: pd.Timestamp, end: pd.Timestamp,) -> float:
+    def optimize(
+        self,
+        ra: float,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> float:
         estimator = CovEstimators.RISKFOLIO.value(
             alpha=ra,
             estimator_type="shrunk",
@@ -144,12 +151,37 @@ class ShrinkageGPOOS:
         self.previous_points.append(x)
         self.previous_targets.append(acq_fn_val)
 
-        self.gpr.fit(
-            np.array(self.previous_points).reshape(-1, 1),
-            np.array(self.previous_targets),
-        )
+        # Create a new GP model if we have too many points to avoid slowdown
+        if (
+            len(self.previous_points) >= self.N_RECENT_POINTS
+        ):  # Threshold can be adjusted based on performance needs
+            # Create a new GP model with the same parameters but trained on a subset of recent points
+            # This prevents the model from becoming slower with each iteration
+            recent_points = self.previous_points[
+                -self.N_RECENT_POINTS :
+            ]  # Keep the most recent 50 points
+            recent_targets = self.previous_targets[-self.N_RECENT_POINTS :]
+
+            self.gpr = GaussianProcessRegressor(
+                kernel=RBF(),
+                n_restarts_optimizer=12,
+                random_state=12,
+            )
+
+            self.gpr.fit(
+                np.array(recent_points).reshape(-1, 1),
+                np.array(recent_targets),
+            )
+        else:
+            # For small datasets, fit on all data
+            self.gpr.fit(
+                np.array(self.previous_points).reshape(-1, 1),
+                np.array(self.previous_targets),
+            )
 
     def get_solution(self) -> tuple[float, np.ndarray]:
+        # If we're using a subset of points for training, we should consider
+        # finding the best point among all historical data, not just the recent subset
         idx = np.argmax(np.array(self.previous_targets))
         ra_init = self.previous_points[idx]
 
@@ -164,37 +196,44 @@ class ShrinkageGPOOS:
 
         return ra_opt
 
-available_dates = runner.returns.simple_returns.iloc[252:].index
 
-last_date = available_dates[-1]
+def train(start: str | None = None):
+    start = pd.Timestamp(start) if start else pd.Timestamp("1980-01-01")
+    available_dates = runner.returns.simple_returns.loc[start:].index
 
-optimal = []
-i = 0
-opt = ShrinkageGPOOS()
-for date in tqdm(available_dates):
-    start_date = date
-    end_date = runner.returns.simple_returns.loc[start_date:].iloc[20:].index[0]
+    last_date = available_dates[-1]
 
-    if end_date > last_date:
-        break
+    optimal = []
+    i = 0
+    opt = ShrinkageGPOOS()
+    for date in tqdm(available_dates):
+        start_date = date
+        end_date = runner.returns.simple_returns.loc[start_date:].iloc[20:].index[0]
 
-    ra = opt.next_recommendation()
+        if end_date > last_date:
+            break
 
-    sharpe = opt.optimize(ra, start_date, end_date)
+        ra = opt.next_recommendation()
 
-    opt.add_data_point(ra, sharpe)
+        sharpe = opt.optimize(ra, start_date, end_date)
 
-    ra_opt = opt.get_solution()
+        opt.add_data_point(ra, sharpe)
 
-    optimal.append([end_date, ra_opt])
+        ra_opt = opt.get_solution()
 
-    if i % 20 == 0:
-        optimal_df = pd.DataFrame(optimal, columns=["end_date", "shrinkage"]).set_index("end_date")
-        optimal_df.to_csv("gp_ucb.csv", index=True, header=True)
+        optimal.append([end_date, ra_opt])
 
-    i += 1
+        if i % 20 == 0:
+            optimal_df = pd.DataFrame(optimal, columns=["date", "shrinkage"]).set_index(
+                "date"
+            )
+            optimal_df.to_csv("gp_ucb.csv", index=True, header=True)
 
-optimal_df = pd.DataFrame(optimal, columns=["end_date", "shrinkage"]).set_index(
-    "end_date"
-)
-optimal_df.to_csv("gp_ucb.csv", index=True, header=True)
+        i += 1
+
+    optimal_df = pd.DataFrame(optimal, columns=["date", "shrinkage"]).set_index("date")
+    optimal_df.to_csv("gp_ucb.csv", index=True, header=True)
+
+
+if __name__ == "__main__":
+    train()
