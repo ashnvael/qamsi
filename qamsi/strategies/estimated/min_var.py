@@ -21,7 +21,7 @@ class MinVariance(BaseStrategy):
         self,
         cov_estimator: BaseCovEstimator,
         trading_config: TradingConfig,
-        window_size: int,
+        window_size: int | None = None,
     ) -> None:
         super().__init__()
 
@@ -32,7 +32,7 @@ class MinVariance(BaseStrategy):
     def _fit(self, training_data: TrainingData) -> None:
         ret = training_data.simple_excess_returns[self.available_assets]
 
-        start_date = ret.index[-1] - pd.Timedelta(days=self.window_size)
+        start_date = ret.index[-1] - pd.Timedelta(days=self.window_size) if self.window_size is not None else ret.index[0]
         ret = ret.loc[start_date:]
 
         n_valid_points = (~ret.isna()).sum(axis=0) / len(ret)
@@ -55,12 +55,6 @@ class MinVariance(BaseStrategy):
             if training_data.log_excess_returns is not None
             else None
         )
-        training_data.targets = (
-            training_data.targets.loc[start_date:]
-            if training_data.targets is not None
-            else None
-        )
-        training_data.features = training_data.features.loc[start_date:]
         training_data.factors = training_data.factors.loc[start_date:]
 
         self.cov_estimator.fit(training_data)

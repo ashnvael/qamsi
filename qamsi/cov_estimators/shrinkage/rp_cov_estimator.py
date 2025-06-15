@@ -22,7 +22,6 @@ class RiskfolioCovEstimator(BaseCovEstimator):
 
     def _fit(self, training_data: TrainingData) -> None:
         ret = training_data.simple_excess_returns
-        # ret = ret.fillna(ret.mean(axis=0))
 
         self._fitted_cov = rp.ParamsEstimation.covar_matrix(
             ret,

@@ -84,17 +84,17 @@ class ExperimentConfig(BaseExperimentConfig):
 
     # Experiment Settings
     START_DATE: pd.Timestamp = field(
-        default=pd.to_datetime("1999-12-18"),
+        default=pd.to_datetime("2000-12-18"),
         metadata={"docs": "Date to start training"},
     )
 
     END_DATE: pd.Timestamp = field(
         default=pd.to_datetime("2024-12-31"),
-        metadata={"docs": "Date to end train (as per paper by Paoella and co)"},
+        metadata={"docs": "Date to end train (as per paper by DNK)"},
     )
 
     REBALANCE_FREQ: int | str | None = field(
-        default=7,
+        default=21,
         metadata={
             "docs": "Frequency of rebalancing in days (pass `int`) or pandas freq (pass `str`). "
             "Pass `None` for Buy & Hold portfolio",
@@ -121,7 +121,7 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     CAUSAL_WINDOW_SIZE: int | None = field(
-        default=21,
+        default=None,
         metadata={"docs": "Number of datapoints that are not available at rebalancing"},
     )
 
@@ -145,7 +145,7 @@ class ExperimentConfig(BaseExperimentConfig):
         default=(
             "vol",
             "naive_vol",
-            "l_shrinkage",
+            "target",
         ),
         metadata={"docs": "ML Targets"},
     )

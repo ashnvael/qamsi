@@ -20,6 +20,8 @@ from qamsi.strategies.optimization_data import PredictionData, TrainingData
 class Backtester:
     def __init__(  # noqa: PLR0913, PLR0913, RUF100
         self,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
         stocks_returns: Returns,
         targets: pd.DataFrame,
         features: pd.DataFrame,
@@ -38,6 +40,9 @@ class Backtester:
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         super().__init__()
+
+        self.start_date = start_date
+        self.end_date = end_date
 
         self.stocks_returns = stocks_returns
         self.features = features
@@ -84,19 +89,20 @@ class Backtester:
         self.run(strategy, hedger)
 
     def generate_rebal_schedule(self, freq: int | str | None) -> pd.DatetimeIndex:
+        features = self.features.loc[self.start_date:self.end_date]
+        date_index = features.index
+
         if freq is None:
-            schedule = self.features.index
+            schedule = date_index
         elif isinstance(freq, str):
-            date_index = self.features.index
             schedule = (
-                self.features.groupby(date_index.to_period(freq.rstrip("E")))
+                features.groupby(date_index.to_period(freq.rstrip("E")))
                 .tail(1)
                 .index
             )
         elif isinstance(freq, int):
-            date_index = self.features.index
             generated_dates = pd.date_range(
-                start=date_index.min(), end=date_index.max(), freq=f"{freq}D"
+                start=date_index.min(), end=date_index.max(), freq=f"{freq}B"
             )
 
             closest_dates_indices = date_index.get_indexer(
@@ -115,6 +121,9 @@ class Backtester:
                     schedule = schedule[i:]
                     break
 
+        if schedule[-1] == self.end_date:
+            schedule = schedule[:-1]
+
         if freq is None:
             schedule = schedule[:1]
 
@@ -125,7 +134,9 @@ class Backtester:
         self.hedge_schedule = self.generate_rebal_schedule(freq=self.hedge_freq)
 
         if self.verbose:
+            print(f"Backtest on {self.rebal_schedule[0]} to {self.features.index.max()}")  # noqa: T201
             print(f"Num Train Iterations: {len(self.rebal_schedule)}")  # noqa: T201
+            print(f"Num OOS Daily Points: {len(self.features.loc[self.rebal_schedule[0]:])}")
 
     @staticmethod
     def _accrue_returns(

@@ -20,7 +20,7 @@ class MALinearCovEstimator(BaseRLCovEstimator):
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
     ) -> None:
-        pred = features["l_shrinkage_mu"].iloc[-1].item()
+        pred = features["target_rolling_mean"].iloc[-1].item()
 
         if not np.isnan(pred):
             self._pred = pred

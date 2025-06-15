@@ -20,6 +20,8 @@ from qamsi.cov_estimators.rl.gpr_linear_estimator import GPRLinearCovEstimator
 from qamsi.cov_estimators.rl.gp_ucb_estimator import GPUCBCovEstimator
 from qamsi.cov_estimators.rl.uncert_ensemble_estimator import UncertEnsembleCovEstimator
 
+from qamsi.cov_estimators.rl.rf_estimator import RandomForestCovEstimator
+
 
 class CovEstimators(Enum):
     HISTORICAL = HistoricalCovEstimator
@@ -41,3 +43,5 @@ class CovEstimators(Enum):
     GPR = GPRLinearCovEstimator
     GP_UCB = GPUCBCovEstimator
     UNCERT_ENSEMBLE = UncertEnsembleCovEstimator
+
+    RF = RandomForestCovEstimator

@@ -59,9 +59,7 @@ class Runner:
         data_df["date"] = pd.to_datetime(data_df["date"])
         data_df = data_df.set_index("date")
 
-        self.data = data_df.loc[
-            self.experiment_config.START_DATE : self.experiment_config.END_DATE
-        ]
+        self.data = data_df.loc[:self.experiment_config.END_DATE]
 
         if len(self.data) == 0:
             msg = "Backtesting data is empty!"
@@ -127,9 +125,6 @@ class Runner:
 
         self.strategy_backtester = self.init_backtester()
 
-        if self.verbose:
-            print(f"Backtest on {self.data.index.min()} to {self.data.index.max()}")  # noqa: T201
-
     def available_features(self) -> list[str]:
         return self.features.columns.tolist()
 
@@ -146,6 +141,8 @@ class Runner:
         )
 
         return Backtester(
+            start_date=self.experiment_config.START_DATE,
+            end_date=self.experiment_config.END_DATE,
             stocks_returns=self.returns,
             features=self.features,
             targets=self.targets,

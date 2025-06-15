@@ -3,7 +3,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from enum import Enum
 
+import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from qamsi.strategies.optimization_data import PredictionData, TrainingData
 from qamsi.cov_estimators.shrinkage.rp_cov_estimator import RiskfolioCovEstimator
@@ -15,8 +17,12 @@ class ShrinkageType(Enum):
 
 
 class BaseRLCovEstimator(RiskfolioCovEstimator):
-    def __init__(self, shrinkage_type: str = "linear") -> None:
+    def __init__(self, shrinkage_type: str = "linear", window_size: int | None = None) -> None:
         self.shrinkage_type = ShrinkageType(shrinkage_type)
+        self.window_size = window_size
+
+        self.feat_scaler = StandardScaler()
+        self.target_scaler = StandardScaler()
 
         # TODO(@V): Implement DNK QIS
         if self.shrinkage_type == ShrinkageType.QIS:
@@ -49,13 +55,17 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
 
     def _fit(self, training_data: TrainingData) -> None:
         self._seen_training_data = training_data
+
         feat = training_data.features
+        target = training_data.targets["target"]
+
+        start_date = feat.index[-1] - pd.Timedelta(days=self.window_size) if self.window_size is not None else feat.index[0]
+        feat = feat.loc[start_date:]
+        target = target.loc[start_date:]
+
         last_pred = self.predictions
-        target = training_data.targets["l_shrinkage"]
 
-        first_feat, first_target = feat.first_valid_index(), target.first_valid_index()
-
-        first_date = first_feat if first_feat >= first_target else first_target
+        first_date = feat.dropna(how="any").first_valid_index()
 
         feat = feat.loc[first_date:]
         if not last_pred.empty:
@@ -77,13 +87,22 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
 
         target = target.loc[first_date:]
 
+        feat = self.feat_scaler.fit_transform(feat)
+        target_transformed = self.target_scaler.fit_transform(target.values.reshape(-1, 1))
+        target = pd.Series(target_transformed.reshape(-1), index=target.index)
+
         self._fit_shrinkage(features=feat, shrinkage_target=target)
 
     def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
         feat = prediction_data.features
         if not self.predictions.empty and self.trained_with_features:
             feat["prediction"] = self.predictions.iloc[-1].item()
-        pred_shrinkage = self._predict_shrinkage(feat)
+        feat_transformed = self.feat_scaler.transform(feat)
+        pred_shrinkage = self._predict_shrinkage(feat_transformed)
+        pred_shrinkage = self.target_scaler.inverse_transform(np.array([pred_shrinkage]).reshape(-1, 1))[0][
+            0
+        ]
+        pred_shrinkage = np.clip(pred_shrinkage, 0, 1) if self.shrinkage_type == ShrinkageType.LINEAR else pred_shrinkage
         self.alpha = pred_shrinkage
 
         self._predictions.append([feat.index[-1], pred_shrinkage])
