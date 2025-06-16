@@ -121,7 +121,7 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     CAUSAL_WINDOW_SIZE: int | None = field(
-        default=None,
+        default=21,
         metadata={"docs": "Number of datapoints that are not available at rebalancing"},
     )
 
@@ -146,6 +146,8 @@ class ExperimentConfig(BaseExperimentConfig):
             "vol",
             "naive_vol",
             "target",
+            "cgp_ucb",
+            "irl",
         ),
         metadata={"docs": "ML Targets"},
     )

@@ -17,7 +17,7 @@ from qamsi.cov_estimators.ml.glasso_tscv_estimator import GLassoTSCVCovEstimator
 from qamsi.cov_estimators.rl.ma_linear_estimator import MALinearCovEstimator
 from qamsi.cov_estimators.rl.dnk_linear_estimator import DNKLinearCovEstimator
 from qamsi.cov_estimators.rl.gpr_linear_estimator import GPRLinearCovEstimator
-from qamsi.cov_estimators.rl.gp_ucb_estimator import GPUCBCovEstimator
+from qamsi.cov_estimators.rl.pretrained_estimator import PretrainedCovEstimator
 from qamsi.cov_estimators.rl.uncert_ensemble_estimator import UncertEnsembleCovEstimator
 
 from qamsi.cov_estimators.rl.rf_estimator import RandomForestCovEstimator
@@ -41,7 +41,7 @@ class CovEstimators(Enum):
     MA = MALinearCovEstimator
     DNK = DNKLinearCovEstimator
     GPR = GPRLinearCovEstimator
-    GP_UCB = GPUCBCovEstimator
+    PRETRAINED = PretrainedCovEstimator
     UNCERT_ENSEMBLE = UncertEnsembleCovEstimator
 
     RF = RandomForestCovEstimator

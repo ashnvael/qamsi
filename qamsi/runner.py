@@ -97,7 +97,7 @@ class Runner:
         self.rf = self.data[self.experiment_config.RF_NAME]
 
         self.targets = (
-            self.data.loc[:, self.experiment_config.TARGETS]
+            self.data.loc[self.data.index.intersection(set(self.experiment_config.TARGETS))]
             if self.data.columns.isin(self.experiment_config.TARGETS).any()
             else pd.DataFrame(index=self.data.index)
         )

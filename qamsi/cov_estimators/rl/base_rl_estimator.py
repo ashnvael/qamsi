@@ -59,15 +59,16 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         feat = training_data.features
         target = training_data.targets["target"]
 
-        start_date = feat.index[-1] - pd.Timedelta(days=self.window_size) if self.window_size is not None else feat.index[0]
+        start_date = target.index[-1] - pd.Timedelta(days=self.window_size) if self.window_size is not None else target.index[0]
         feat = feat.loc[start_date:]
         target = target.loc[start_date:]
 
         last_pred = self.predictions
 
-        first_date = feat.dropna(how="any").first_valid_index()
+        first_date = target.dropna(how="any").first_valid_index()
+        last_date = target.dropna(how="any").last_valid_index()
 
-        feat = feat.loc[first_date:]
+        feat = feat.loc[first_date:last_date]
         if not last_pred.empty:
             feat = pd.merge_asof(
                 feat,
@@ -85,7 +86,7 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         else:
             self.trained_with_features = False
 
-        target = target.loc[first_date:]
+        target = target.loc[first_date:last_date]
 
         feat = self.feat_scaler.fit_transform(feat)
         target_transformed = self.target_scaler.fit_transform(target.values.reshape(-1, 1))

@@ -288,7 +288,7 @@ def train(start_date: str | None = "1982-01-01"):
 
     runner = get_runner()
     rebal_dates = runner.init_backtester().rebal_schedule
-    lagged_rebal_dates = [date - pd.Timedelta(days=runner.trading_config.trading_lag_days) for date in rebal_dates]
+    # lagged_rebal_dates = [date - pd.Timedelta(days=runner.trading_config.trading_lag_days) for date in rebal_dates]
 
     true_optimal = pd.read_csv("targets.csv")
     true_optimal["start_date"] = pd.to_datetime(true_optimal["start_date"])
@@ -314,7 +314,7 @@ def train(start_date: str | None = "1982-01-01"):
 
             pbar.set_description(f"Date: {current_date}, Action: {action:.6f}, Optimal Action: {true_optimal_action:.6f}, Reward: {reward:.6f}, Optimal Reward: {-true_optimal_value:.6f}")
 
-            if env.get_current_end_date() in lagged_rebal_dates:
+            if env.get_current_end_date() in rebal_dates:
                 agent.exploration_mode = False
                 rebal = env.get_current_end_date()
                 pred_context = env.get_prediction_context(rebal)
