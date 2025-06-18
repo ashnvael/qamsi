@@ -14,21 +14,6 @@ class ExperimentConfig(BaseExperimentConfig):
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
     # Folders
-    PATH_FEATURES: Path = field(
-        default=Path(__file__).resolve().parents[4] / "data" / "gw",
-        metadata={"docs": "Relative path to data folder"},
-    )
-
-    PATH_MARKET_DATA: Path = field(
-        default=Path(__file__).resolve().parents[4] / "data" / "spx_stocks",
-        metadata={"docs": "Relative path to data folder"},
-    )
-
-    PATH_BETTER_MARKET_DATA: Path = field(
-        default=Path(__file__).resolve().parents[4] / "data" / "spxc",
-        metadata={"docs": "Relative path to data folder"},
-    )
-
     PATH_INPUT: Path = field(
         default=Path(__file__).resolve().parents[1] / "data" / "input",
         metadata={"docs": "Relative path to data folder"},
@@ -89,7 +74,7 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     END_DATE: pd.Timestamp = field(
-        default=pd.to_datetime("2024-12-31"),
+        default=pd.to_datetime("2024-08-30"),
         metadata={"docs": "Date to end train (as per paper by DNK)"},
     )
 

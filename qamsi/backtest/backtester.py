@@ -36,6 +36,7 @@ class Backtester:
         min_rolling_periods: int | None,
         rebal_freq: int | str | None,
         hedge_freq: int | str | None,
+        presence_matrix: pd.DataFrame | None = None,
         causal_window_size: int | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
@@ -61,6 +62,7 @@ class Backtester:
         )
         self.rebal_freq = rebal_freq
         self.hedge_freq = hedge_freq
+        self.presence_matrix = presence_matrix
         self.causal_window_size = causal_window_size
         self.verbose = verbose
 
@@ -290,6 +292,10 @@ class Backtester:
     def get_strategy_weights(
         self, strategy: BaseStrategy, pred_date: pd.Timestamp
     ) -> np.array:
+        if self.presence_matrix is not None:
+            curr_matrix = self.presence_matrix.loc[:pred_date].iloc[-1]
+            strategy.universe = curr_matrix[curr_matrix == 1].index.tolist()
+
         training_data, prediction_data = self.get_data(pred_date)
 
         # Whether the strategy has a memory or retrains from scratch is handled inside the strategy obj
@@ -484,7 +490,7 @@ class Backtester:
         weights = weights.copy()
         if add_total_r is not None:
             weights["add"] = 1
-        weights["rf"] = 1 - weights.sum(axis=1)
+        weights["rf"] = (1 - weights.sum(axis=1)).round(5)
 
         last_rebal_date = weights.index[0]
 

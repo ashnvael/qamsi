@@ -23,6 +23,7 @@ from qamsi.backtest.plot import (
 )
 from qamsi.backtest.transaction_costs_charger import TransactionCostCharger
 from qamsi.base.returns import Returns
+from qamsi.utils.data import read_csv
 
 
 class Runner:
@@ -53,13 +54,13 @@ class Runner:
         self._prepare()
 
     def _prepare(self) -> None:
-        data_df = pd.read_csv(
-            self.experiment_config.PATH_OUTPUT / self.experiment_config.DF_FILENAME
-        )
-        data_df["date"] = pd.to_datetime(data_df["date"])
-        data_df = data_df.set_index("date")
+        data_df = read_csv(str(self.experiment_config.PATH_OUTPUT), self.experiment_config.DF_FILENAME)
+        presence_matrix = read_csv(str(self.experiment_config.PATH_OUTPUT), self.experiment_config.PRESENCE_MATRIX_FILENAME)
+        asset_universe = presence_matrix.columns.tolist()
 
         self.data = data_df.loc[: self.experiment_config.END_DATE]
+        self.data.columns = self.data.columns.astype(str)
+        self.presence_matrix = presence_matrix.loc[: self.experiment_config.END_DATE]
 
         if len(self.data) == 0:
             msg = "Backtesting data is empty!"
@@ -68,7 +69,7 @@ class Runner:
         # TODO(@V): Handle by BacktestBuilder on top
         # TODO(@V): Separate files
         prices_names = [
-            stock + "_Price" for stock in self.experiment_config.ASSET_UNIVERSE
+            stock + "_Price" for stock in asset_universe
         ]
         if self.data.columns.isin(prices_names).any():
             self.prices = self.data.loc[:, prices_names]
@@ -77,11 +78,11 @@ class Runner:
             )
         else:
             self.prices = pd.DataFrame(
-                index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE
+                index=self.data.index, columns=asset_universe
             )
 
         market_cap_names = [
-            stock + "_Market_Cap" for stock in self.experiment_config.ASSET_UNIVERSE
+            stock + "_Market_Cap" for stock in asset_universe
         ]
         if self.data.columns.isin(market_cap_names).any():
             self.mkt_caps = self.data.loc[:, market_cap_names]
@@ -90,10 +91,10 @@ class Runner:
             )
         else:
             self.mkt_caps = pd.DataFrame(
-                index=self.data.index, columns=self.experiment_config.ASSET_UNIVERSE
+                index=self.data.index, columns=asset_universe
             )
 
-        self.returns = Returns(self.data.loc[:, self.experiment_config.ASSET_UNIVERSE])
+        self.returns = Returns(self.data.loc[:, asset_universe])
         self.rf = self.data[self.experiment_config.RF_NAME]
 
         self.targets = (
@@ -115,7 +116,7 @@ class Runner:
         )
 
         exclude = [
-            *self.experiment_config.ASSET_UNIVERSE,
+            *asset_universe,
             *prices_names,
             *market_cap_names,
             self.experiment_config.RF_NAME,
@@ -158,6 +159,7 @@ class Runner:
             min_rolling_periods=self.experiment_config.MIN_ROLLING_PERIODS,
             rebal_freq=self.experiment_config.REBALANCE_FREQ,
             hedge_freq=hedge_freq,
+            presence_matrix=self.presence_matrix,
             causal_window_size=self.experiment_config.CAUSAL_WINDOW_SIZE,
             verbose=self.verbose,
             hedging_assets=hedging_assets_ret,
