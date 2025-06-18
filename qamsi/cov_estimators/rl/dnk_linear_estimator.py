@@ -26,7 +26,9 @@ class DNKLinearCovEstimator(BaseRLCovEstimator):
     ) -> None:
         if shrinkage_target.isna().any():
             self.encountered_nan = True
-            print(f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target.")
+            print(
+                f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target."
+            )
         else:
             self.enet = ElasticNetCV(
                 cv=TimeSeriesSplit(n_splits=5),

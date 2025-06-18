@@ -17,7 +17,9 @@ class ShrinkageType(Enum):
 
 
 class BaseRLCovEstimator(RiskfolioCovEstimator):
-    def __init__(self, shrinkage_type: str = "linear", window_size: int | None = None) -> None:
+    def __init__(
+        self, shrinkage_type: str = "linear", window_size: int | None = None
+    ) -> None:
         self.shrinkage_type = ShrinkageType(shrinkage_type)
         self.window_size = window_size
 
@@ -59,7 +61,11 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         feat = training_data.features
         target = training_data.targets["target"]
 
-        start_date = target.index[-1] - pd.Timedelta(days=self.window_size) if self.window_size is not None else target.index[0]
+        start_date = (
+            target.index[-1] - pd.Timedelta(days=self.window_size)
+            if self.window_size is not None
+            else target.index[0]
+        )
         feat = feat.loc[start_date:]
         target = target.loc[start_date:]
 
@@ -89,7 +95,9 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         target = target.loc[first_date:last_date]
 
         feat = self.feat_scaler.fit_transform(feat)
-        target_transformed = self.target_scaler.fit_transform(target.values.reshape(-1, 1))
+        target_transformed = self.target_scaler.fit_transform(
+            target.values.reshape(-1, 1)
+        )
         target = pd.Series(target_transformed.reshape(-1), index=target.index)
 
         self._fit_shrinkage(features=feat, shrinkage_target=target)
@@ -100,10 +108,14 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
             feat["prediction"] = self.predictions.iloc[-1].item()
         feat_transformed = self.feat_scaler.transform(feat)
         pred_shrinkage = self._predict_shrinkage(feat_transformed)
-        pred_shrinkage = self.target_scaler.inverse_transform(np.array([pred_shrinkage]).reshape(-1, 1))[0][
-            0
-        ]
-        pred_shrinkage = np.clip(pred_shrinkage, 0, 1) if self.shrinkage_type == ShrinkageType.LINEAR else pred_shrinkage
+        pred_shrinkage = self.target_scaler.inverse_transform(
+            np.array([pred_shrinkage]).reshape(-1, 1)
+        )[0][0]
+        pred_shrinkage = (
+            np.clip(pred_shrinkage, 0, 1)
+            if self.shrinkage_type == ShrinkageType.LINEAR
+            else pred_shrinkage
+        )
         self.alpha = pred_shrinkage
 
         self._predictions.append([feat.index[-1], pred_shrinkage])

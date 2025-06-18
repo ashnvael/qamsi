@@ -89,16 +89,14 @@ class Backtester:
         self.run(strategy, hedger)
 
     def generate_rebal_schedule(self, freq: int | str | None) -> pd.DatetimeIndex:
-        features = self.features.loc[self.start_date:self.end_date]
+        features = self.features.loc[self.start_date : self.end_date]
         date_index = features.index
 
         if freq is None:
             schedule = date_index
         elif isinstance(freq, str):
             schedule = (
-                features.groupby(date_index.to_period(freq.rstrip("E")))
-                .tail(1)
-                .index
+                features.groupby(date_index.to_period(freq.rstrip("E"))).tail(1).index
             )
         elif isinstance(freq, int):
             generated_dates = pd.date_range(
@@ -134,9 +132,13 @@ class Backtester:
         self.hedge_schedule = self.generate_rebal_schedule(freq=self.hedge_freq)
 
         if self.verbose:
-            print(f"Backtest on {self.rebal_schedule[0]} to {self.features.index.max()}")  # noqa: T201
+            print(
+                f"Backtest on {self.rebal_schedule[0]} to {self.features.index.max()}"
+            )  # noqa: T201
             print(f"Num Train Iterations: {len(self.rebal_schedule)}")  # noqa: T201
-            print(f"Num OOS Daily Points: {len(self.features.loc[self.rebal_schedule[0]:])}")
+            print(
+                f"Num OOS Daily Points: {len(self.features.loc[self.rebal_schedule[0] :])}"
+            )
 
     @staticmethod
     def _accrue_returns(

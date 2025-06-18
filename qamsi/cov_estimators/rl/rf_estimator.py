@@ -22,7 +22,9 @@ class RandomForestCovEstimator(BaseRLCovEstimator):
     ) -> None:
         if shrinkage_target.isna().any():
             self.encountered_nan = True
-            print(f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target.")
+            print(
+                f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target."
+            )
         else:
             self.rf = RandomForestRegressor(
                 n_estimators=30,

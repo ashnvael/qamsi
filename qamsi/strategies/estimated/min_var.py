@@ -32,7 +32,11 @@ class MinVariance(BaseStrategy):
     def _fit(self, training_data: TrainingData) -> None:
         ret = training_data.simple_excess_returns[self.available_assets]
 
-        start_date = ret.index[-1] - pd.Timedelta(days=self.window_size) if self.window_size is not None else ret.index[0]
+        start_date = (
+            ret.index[-1] - pd.Timedelta(days=self.window_size)
+            if self.window_size is not None
+            else ret.index[0]
+        )
         ret = ret.loc[start_date:]
 
         n_valid_points = (~ret.isna()).sum(axis=0) / len(ret)

@@ -19,11 +19,14 @@ from run import Dataset
 
 DATASET = Dataset.SPX_US
 
+
 def get_runner() -> Runner:
     experiment_config = DATASET.value()
 
     stocks = tuple(
-        pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME)
+        pd.read_csv(
+            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
+        )
         .iloc[:, 0]
         .astype(str)
         .tolist(),
@@ -61,8 +64,12 @@ class BanditEnvironment:
         self.features = self.experiment_runner.features
         # self.features = self.experiment_runner.factors.shift(1).fillna(0)
 
-        self.start_dates = self.experiment_runner.returns.simple_returns.loc[start_date:].index
-        self.end_dates = [date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates]
+        self.start_dates = self.experiment_runner.returns.simple_returns.loc[
+            start_date:
+        ].index
+        self.end_dates = [
+            date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates
+        ]
 
         self.current_id = 0
         self.current_start = self.start_dates[self.current_id]
@@ -122,7 +129,9 @@ class BanditEnvironment:
 
     @property
     def action_hist(self):
-        return pd.DataFrame(self._action_hist, columns=["date", "cgp_ucb"]).set_index("date")
+        return pd.DataFrame(self._action_hist, columns=["date", "cgp_ucb"]).set_index(
+            "date"
+        )
 
 
 class CGPUCBAgent:
@@ -157,7 +166,9 @@ class CGPUCBAgent:
 
         self.current_round = 1
         self.X_cardinality = n_actions * n_contexts
-        self.acq_beta = self.optimal_beta_selection(self.current_round, self.X_cardinality)
+        self.acq_beta = self.optimal_beta_selection(
+            self.current_round, self.X_cardinality
+        )
 
     @property
     def exploration_mode(self):
@@ -183,7 +194,9 @@ class CGPUCBAgent:
         return self.optimize_acquisition_function(context).item()
 
     def get_action(self, context: np.ndarray) -> float:
-        self.acq_beta = self.optimal_beta_selection(self.current_round, self.X_cardinality)
+        self.acq_beta = self.optimal_beta_selection(
+            self.current_round, self.X_cardinality
+        )
         # self.acq_beta = 1.96
         self.current_round += 1
         if self._exploration_mode:
@@ -226,7 +239,9 @@ class CGPUCBAgent:
 
         return (mu_f + sigma_f * self.acq_beta)[0]
 
-    def add_data_point(self, action: float, context: np.ndarray, acq_fn_val: float) -> None:
+    def add_data_point(
+        self, action: float, context: np.ndarray, acq_fn_val: float
+    ) -> None:
         self.previous_actions.append(action)
         self.previous_contexts.append(context)
         self.previous_targets.append(acq_fn_val)
@@ -309,17 +324,31 @@ def train(start_date: str | None = "1982-01-01"):
             agent.add_data_point(action, context, reward)
 
             current_date = env.get_current_date()
-            true_optimal_action = true_optimal.loc[current_date, "shrinkage"] if current_date in true_optimal.index else 0.0
-            true_optimal_value = true_optimal.loc[current_date, "vol"] if current_date in true_optimal.index else 0.0
+            true_optimal_action = (
+                true_optimal.loc[current_date, "shrinkage"]
+                if current_date in true_optimal.index
+                else 0.0
+            )
+            true_optimal_value = (
+                true_optimal.loc[current_date, "vol"]
+                if current_date in true_optimal.index
+                else 0.0
+            )
 
-            pbar.set_description(f"Date: {current_date}, Action: {action:.6f}, Optimal Action: {true_optimal_action:.6f}, Reward: {reward:.6f}, Optimal Reward: {-true_optimal_value:.6f}")
+            pbar.set_description(
+                f"Date: {current_date}, Action: {action:.6f}, Optimal Action: {true_optimal_action:.6f}, Reward: {reward:.6f}, Optimal Reward: {-true_optimal_value:.6f}"
+            )
 
             if env.get_current_end_date() in rebal_dates:
                 agent.exploration_mode = False
                 rebal = env.get_current_end_date()
                 pred_context = env.get_prediction_context(rebal)
                 solution = agent.get_solution(pred_context)
-                optim_solution = true_optimal.loc[current_date, "shrinkage"] if current_date in true_optimal.index else 0.0
+                optim_solution = (
+                    true_optimal.loc[current_date, "shrinkage"]
+                    if current_date in true_optimal.index
+                    else 0.0
+                )
                 # print(f"\nRebalance: {rebal}, Solution: {solution}, Optimal Solution: {optim_solution}")
                 optim.append([rebal, solution])
             else:
@@ -333,6 +362,7 @@ def train(start_date: str | None = "1982-01-01"):
     except:
         optim = pd.DataFrame(optim, columns=["date", "cgp_ucb"]).set_index("date")
         optim.to_csv("cgp_ucb_gmv.csv", index=True, header=True)
+
 
 if __name__ == "__main__":
     train()

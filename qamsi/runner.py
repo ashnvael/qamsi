@@ -59,7 +59,7 @@ class Runner:
         data_df["date"] = pd.to_datetime(data_df["date"])
         data_df = data_df.set_index("date")
 
-        self.data = data_df.loc[:self.experiment_config.END_DATE]
+        self.data = data_df.loc[: self.experiment_config.END_DATE]
 
         if len(self.data) == 0:
             msg = "Backtesting data is empty!"
@@ -97,7 +97,9 @@ class Runner:
         self.rf = self.data[self.experiment_config.RF_NAME]
 
         self.targets = (
-            self.data.loc[self.data.index.intersection(set(self.experiment_config.TARGETS))]
+            self.data.loc[
+                self.data.index.intersection(set(self.experiment_config.TARGETS))
+            ]
             if self.data.columns.isin(self.experiment_config.TARGETS).any()
             else pd.DataFrame(index=self.data.index)
         )

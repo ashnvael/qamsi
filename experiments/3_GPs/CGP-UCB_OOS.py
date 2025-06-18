@@ -16,11 +16,14 @@ from run import Dataset
 
 DATASET = Dataset.SPX_US
 
+
 def get_runner() -> Runner:
     experiment_config = DATASET.value()
 
     stocks = tuple(
-        pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME)
+        pd.read_csv(
+            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
+        )
         .iloc[:, 0]
         .astype(str)
         .tolist(),
@@ -51,7 +54,9 @@ def get_runner() -> Runner:
 
 
 class BanditEnvironment:
-    def __init__(self, experiment_runner: Runner, start_date: pd.Timestamp | None = None) -> None:
+    def __init__(
+        self, experiment_runner: Runner, start_date: pd.Timestamp | None = None
+    ) -> None:
         self.action_space = np.linspace(0, 1, 100)
 
         self.experiment_runner = experiment_runner
@@ -59,8 +64,12 @@ class BanditEnvironment:
         # self.features = self.experiment_runner.features
         self.features = self.experiment_runner.factors.shift(1).fillna(0)
 
-        self.start_dates = self.experiment_runner.returns.simple_returns.loc[start_date:].index
-        self.end_dates = [date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates]
+        self.start_dates = self.experiment_runner.returns.simple_returns.loc[
+            start_date:
+        ].index
+        self.end_dates = [
+            date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates
+        ]
 
         self.current_id = 0
         self.current_start = self.start_dates[self.current_id]
@@ -115,7 +124,9 @@ class BanditEnvironment:
 
     @property
     def action_hist(self):
-        return pd.DataFrame(self._action_hist, columns=["date", "cgp_ucb"]).set_index("date")
+        return pd.DataFrame(self._action_hist, columns=["date", "cgp_ucb"]).set_index(
+            "date"
+        )
 
 
 def train(start: str | None = None):
@@ -146,6 +157,7 @@ def train(start: str | None = None):
 
         if i % 20 == 0:
             env.action_hist.to_csv("cgp_ucb.csv", index=True, header=True)
+
 
 if __name__ == "__main__":
     train("1981-01-01")

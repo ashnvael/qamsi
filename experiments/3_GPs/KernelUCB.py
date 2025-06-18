@@ -18,11 +18,14 @@ from run import Dataset
 
 DATASET = Dataset.SPX_US
 
+
 def get_runner() -> Runner:
     experiment_config = DATASET.value()
 
     stocks = tuple(
-        pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME)
+        pd.read_csv(
+            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
+        )
         .iloc[:, 0]
         .astype(str)
         .tolist(),
@@ -54,20 +57,37 @@ def get_runner() -> Runner:
 
 
 class BanditEnvironment:
-    def __init__(self, experiment_runner: Runner, start_date: pd.Timestamp, train_end: pd.Timestamp, min_reward: float | None = None, max_reward: float | None = None) -> None:
+    def __init__(
+        self,
+        experiment_runner: Runner,
+        start_date: pd.Timestamp,
+        train_end: pd.Timestamp,
+        min_reward: float | None = None,
+        max_reward: float | None = None,
+    ) -> None:
         self.experiment_runner = experiment_runner
         self.min_reward = min_reward
         self.max_reward = max_reward
 
         scaler = StandardScaler()
 
-        self.features = self.experiment_runner.features
+        self.features = self.experiment_runner.features.drop(
+            columns=["irl"], errors="ignore"
+        )
         scaler.fit(self.features.loc[self.features.index < train_end])
         self.features = scaler.transform(self.features)
-        self.features = pd.DataFrame(self.features, columns=self.experiment_runner.features.columns, index=self.experiment_runner.features.index)
+        self.features = pd.DataFrame(
+            self.features,
+            columns=self.experiment_runner.features.columns,
+            index=self.experiment_runner.features.index,
+        )
 
-        self.start_dates = self.experiment_runner.returns.simple_returns.loc[start_date:].index
-        self.end_dates = [date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates]
+        self.start_dates = self.experiment_runner.returns.simple_returns.loc[
+            start_date:
+        ].index
+        self.end_dates = [
+            date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates
+        ]
 
         self.current_id = 0
         self.current_start = self.start_dates[self.current_id]
@@ -137,7 +157,9 @@ class BanditEnvironment:
 
     @property
     def action_hist(self):
-        return pd.DataFrame(self._action_hist, columns=["date", "cgp_ucb"]).set_index("date")
+        return pd.DataFrame(self._action_hist, columns=["date", "cgp_ucb"]).set_index(
+            "date"
+        )
 
 
 def plot_regret(
@@ -181,14 +203,24 @@ def train(start_date: str | None = "1982-01-01"):
     # min_reward = None
     # max_reward = None
     if min_reward is not None and max_reward is not None:
-        true_optimal["reward"] = (true_optimal_train["reward"] - min_reward) / (max_reward - min_reward)
+        true_optimal["reward"] = (true_optimal["reward"] - min_reward) / (
+            max_reward - min_reward
+        )
 
-    env = BanditEnvironment(runner, min_reward=min_reward, max_reward=max_reward, start_date=start_date, train_end=train_end)
+    env = BanditEnvironment(
+        runner,
+        min_reward=min_reward,
+        max_reward=max_reward,
+        start_date=start_date,
+        train_end=train_end,
+    )
 
     optimal_grid = np.linspace(0.0, 1.0, 100, endpoint=False)
     optimal_grid = np.append(optimal_grid, np.array([1.0]))
 
-    agent = KernelUCB(len(optimal_grid), env.n_features, alpha=1.0, kernel="linear", gamma=0.5)
+    agent = KernelUCB(
+        len(optimal_grid), env.n_features, alpha=1.0, kernel="linear", gamma=0.5
+    )
 
     # initialize CGP-UCB
     rounds = len(env)
@@ -216,10 +248,20 @@ def train(start_date: str | None = "1982-01-01"):
             rewards.append(reward)
             # avg_reward = total_reward / (t + 1)
 
-            true_optimal_action = true_optimal.loc[current_date, "shrinkage"] if current_date in true_optimal.index else 0.0
-            true_optimal_value = true_optimal.loc[current_date, "reward"] if current_date in true_optimal.index else 0.0
+            true_optimal_action = (
+                true_optimal.loc[current_date, "shrinkage"]
+                if current_date in true_optimal.index
+                else 0.0
+            )
+            true_optimal_value = (
+                true_optimal.loc[current_date, "reward"]
+                if current_date in true_optimal.index
+                else 0.0
+            )
 
-            pbar.set_description(f"Date: {current_date}, Action: {action:.6f}, Optimal Action: {true_optimal_action:.6f}, Reward: {reward:.6f}, Optimal Reward: {true_optimal_value:.6f}")
+            pbar.set_description(
+                f"Date: {current_date}, Action: {action:.6f}, Optimal Action: {true_optimal_action:.6f}, Reward: {reward:.6f}, Optimal Reward: {true_optimal_value:.6f}"
+            )
 
             optimal_values.append(true_optimal_value)
             if t % 20 == 0 and t > 0:
@@ -238,6 +280,7 @@ def train(start_date: str | None = "1982-01-01"):
     except:
         optim = pd.DataFrame(optim, columns=["date", "cgp_ucb"]).set_index("date")
         optim.to_csv("cgp_ucb_gmv.csv", index=True, header=True)
+
 
 if __name__ == "__main__":
     train()
