@@ -9,39 +9,33 @@ if TYPE_CHECKING:
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct
+from sklearn.preprocessing import StandardScaler
 
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
 class GPRLinearCovEstimator(BaseRLCovEstimator):
-    def __init__(self, shrinkage_type: str, kernel=DotProduct()) -> None:
-        super().__init__(shrinkage_type=shrinkage_type)
+    def __init__(
+        self, shrinkage_type: str, kernel=DotProduct(), window_size: int | None = None
+    ) -> None:
+        super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
 
         self.gpr = GaussianProcessRegressor(
             kernel=kernel,
-            n_restarts_optimizer=12,
+            n_restarts_optimizer=3,
             random_state=12,
         )
+
+        self.target_scaler = StandardScaler(with_std=False)
 
         self.last_pred = None
         self.encountered_nan = False
 
         self.shrinkage_mean = None
 
-    def _transform_shrinkage_target(self, shrinkage_target: pd.Series) -> pd.Series:
-        self.shrinkage_mean = shrinkage_target.mean()
-        shrinkage_target = shrinkage_target - self.shrinkage_mean
-        # return np.log(shrinkage_target) - np.log(1 - shrinkage_target)
-        return shrinkage_target
-
-    def _inv_transform_shrinkage_target(self, shrinkage_target: float) -> float:
-        # return 1 / (1 + np.exp(-shrinkage_target)) + self.shrinkage_mean
-        return shrinkage_target + self.shrinkage_mean
-
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
     ) -> None:
-        shrinkage_target = self._transform_shrinkage_target(shrinkage_target)
         if shrinkage_target.isna().any():
             self.encountered_nan = True
         else:
@@ -51,7 +45,6 @@ class GPRLinearCovEstimator(BaseRLCovEstimator):
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:
         if not self.encountered_nan:
             pred = self.gpr.predict(features).item()
-            pred = self._inv_transform_shrinkage_target(pred)
             pred = np.clip(pred, 0, 1)
             self.last_pred = pred
             return pred

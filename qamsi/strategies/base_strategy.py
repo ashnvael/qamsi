@@ -21,9 +21,19 @@ class BaseStrategy(ABC):
     def __init__(self) -> None:
         super().__init__()
 
+        self._universe_assets = None
+
         self.all_assets = None
         self.available_assets = None
         self._weights_template = None
+
+    @property
+    def universe(self) -> list[str]:
+        return self._universe_assets
+
+    @universe.setter
+    def universe(self, universe_assets: list[str]) -> None:
+        self._universe_assets = universe_assets
 
     def fit(self, training_data: TrainingData) -> None:
         simple_xs_r = training_data.simple_excess_returns
@@ -31,6 +41,9 @@ class BaseStrategy(ABC):
         available_stocks = simple_xs_r.loc[
             :, ~simple_xs_r.iloc[-1].isna()
         ].columns.tolist()
+        if self.universe is not None:
+            available_stocks = list(set(available_stocks) & set(self.universe))
+
         self.all_assets = simple_xs_r.columns.tolist()
         self.available_assets = simple_xs_r[available_stocks].columns.tolist()
 

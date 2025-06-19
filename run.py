@@ -12,14 +12,17 @@ from qamsi.features.preprocessor import Preprocessor
 
 from config.liquid_experiment_config import ExperimentConfig as LiquidConfig
 from config.spx_experiment_config import ExperimentConfig as SPXConfig
+from config.topn_experiment_config import ExperimentConfig as TopNConfig
 
 
 class Dataset(Enum):
     LIQUID_US = LiquidConfig
     SPX_US = SPXConfig
+    TOPN_US = TopNConfig
 
 
 REBAL_FREQ = "ME"
+
 DATASET = Dataset.SPX_US
 
 ESTIMATION_WINDOW = 365 * 3
@@ -27,26 +30,37 @@ ESTIMATOR = CovEstimators.GLASSO.value()
 
 SAVE = True
 
+TRADING_CONFIG = TradingConfig(
+    broker_fee=0.05 / 100,
+    bid_ask_spread=0.03 / 100,
+    total_exposure=1,
+    max_exposure=1,
+    min_exposure=0,
+    trading_lag_days=1,
+)
 
-def run_backtest() -> StrategyStatistics:
-    print("Running backtest...")
-    print(f"Estimation window: {ESTIMATION_WINDOW}")
 
-    experiment_config = DATASET.value()
+def initialize(
+        dataset: Dataset,
+        with_causal_window: bool = True,
+        start: str | None = None,
+        end: str | None = None,
+        trading_config: TradingConfig = TRADING_CONFIG,
+        rebal_freq: str = REBAL_FREQ,
+        topn: int | None = None,
+) -> tuple[Preprocessor, Runner]:
+    experiment_config = dataset.value(topn=topn) if topn else dataset.value()
 
-    stocks = tuple(
-        pd.read_csv(
-            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
-        )
-        .iloc[:, 0]
-        .astype(str)
-        .tolist(),
-    )
-    experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
-
-    experiment_config.MIN_ROLLING_PERIODS = ESTIMATION_WINDOW + 1
     experiment_config.N_LOOKBEHIND_PERIODS = None
-    experiment_config.REBALANCE_FREQ = REBAL_FREQ
+    experiment_config.REBALANCE_FREQ = rebal_freq
+
+    if not with_causal_window:
+        experiment_config.CAUSAL_WINDOW_SIZE = None
+
+    if start is not None:
+        experiment_config.START_DATE = pd.Timestamp(start)
+    if end is not None:
+        experiment_config.END_DATE = pd.Timestamp(end)
 
     factors = pd.read_csv(experiment_config.PATH_OUTPUT / "factors.csv")
     factors["date"] = pd.to_datetime(factors["date"])
@@ -54,36 +68,28 @@ def run_backtest() -> StrategyStatistics:
     factor_names = tuple(factors.columns.astype(str).tolist())
     experiment_config.FACTORS = factor_names
 
-    prices = [stock + "_Price" for stock in list(stocks)]
-    preprocessor = Preprocessor(
-        exclude_names=[
-            *list(stocks),
-            experiment_config.RF_NAME,
-            *experiment_config.HEDGING_ASSETS,
-            *factor_names,
-            *prices,
-        ],
-    )
-
-    trading_config = TradingConfig(
-        broker_fee=0.05 / 100,
-        bid_ask_spread=0.03 / 100,
-        total_exposure=1,
-        max_exposure=1,
-        min_exposure=0,
-        trading_lag_days=1,
-    )
-
-    strategy = MinVariance(
-        cov_estimator=ESTIMATOR,
-        trading_config=trading_config,
-        window_size=ESTIMATION_WINDOW,
-    )
+    preprocessor = Preprocessor()
 
     runner = Runner(
         experiment_config=experiment_config,
         trading_config=trading_config,
         verbose=True,
+    )
+
+    return preprocessor, runner
+
+
+def run_backtest() -> StrategyStatistics:
+    print("Running backtest...")
+    print(f"Estimation window: {ESTIMATION_WINDOW}")
+
+    preprocessor, runner = initialize(DATASET, TRADING_CONFIG, topn=100)
+    trading_config = TRADING_CONFIG
+
+    strategy = MinVariance(
+        cov_estimator=ESTIMATOR,
+        trading_config=trading_config,
+        window_size=ESTIMATION_WINDOW,
     )
 
     result = runner(

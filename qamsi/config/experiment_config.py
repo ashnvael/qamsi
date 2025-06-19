@@ -26,6 +26,10 @@ class BaseExperimentConfig:
         default="data_df.csv", metadata={"docs": "Preprocessed data"}
     )
 
+    PRESENCE_MATRIX_FILENAME: str | None = field(
+        default="presence_matrix.csv", metadata={"docs": "Presence matrix (2d pivot)"}
+    )
+
     # Experiment Settings
     START_DATE: pd.Timestamp | None = field(
         default=pd.to_datetime("1980-01-01"),
@@ -70,11 +74,6 @@ class BaseExperimentConfig:
     )
 
     # Universe Setting
-    ASSET_UNIVERSE: tuple[str] = field(
-        default=("MOEX_INDEX",),
-        metadata={"docs": "Tradeable assets tuple"},
-    )
-
     FACTORS: tuple[str] = field(
         default=("MOEX_INDEX",),
         metadata={"docs": "Tradeable factors tuple"},

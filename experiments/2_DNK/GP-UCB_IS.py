@@ -1,70 +1,35 @@
-# %%
 from __future__ import annotations
 
-# %%
-import pandas as pd
-from qamsi.config.trading_config import TradingConfig
-from qamsi.runner import Runner
-from qamsi.strategies.estimated.min_var import MinVariance
-from qamsi.cov_estimators.cov_estimators import CovEstimators
-from qamsi.features.preprocessor import Preprocessor
-from run import Dataset
-
-# %%
-REBAL_FREQ = "ME"
-DATASET = Dataset.SPX_US
-ESTIMATION_WINDOW = 365 * 1
-# %%
-experiment_config = DATASET.value()
-
-stocks = tuple(
-    pd.read_csv(experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME)
-    .iloc[:, 0]
-    .astype(str)
-    .tolist(),
-)
-experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
-
-experiment_config.START_DATE = "1980-01-01"
-experiment_config.MIN_ROLLING_PERIODS = ESTIMATION_WINDOW + 1
-experiment_config.N_LOOKBEHIND_PERIODS = None
-experiment_config.REBALANCE_FREQ = REBAL_FREQ
-
-factors = pd.read_csv(experiment_config.PATH_OUTPUT / "factors.csv")
-factors["date"] = pd.to_datetime(factors["date"])
-factors = factors.set_index("date")
-factor_names = tuple(factors.columns.astype(str).tolist())
-experiment_config.FACTORS = factor_names
-
-prices = [stock + "_Price" for stock in list(stocks)]
-preprocessor = Preprocessor(
-    exclude_names=[
-        *list(stocks),
-        experiment_config.RF_NAME,
-        *experiment_config.HEDGING_ASSETS,
-        *factor_names,
-        *prices,
-    ],
-)
-
-trading_config = TradingConfig(
-    total_exposure=1,
-    max_exposure=1,
-    min_exposure=0,
-    trading_lag_days=1,
-)
-
-runner = Runner(
-    experiment_config=experiment_config,
-    trading_config=trading_config,
-    verbose=False,
-)
-# %%
 import numpy as np
+import pandas as pd
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF
 from scipy.optimize import fmin_l_bfgs_b, minimize
+
+from qamsi.config.trading_config import TradingConfig
+from qamsi.strategies.estimated.min_var import MinVariance
+from qamsi.cov_estimators.cov_estimators import CovEstimators
+from run import Dataset, initialize
+
+REBAL_FREQ = "ME"
+DATASET = Dataset.TOPN_US
+TOP_N = 30
+ESTIMATION_WINDOW = 365
+
+trading_config = TradingConfig(
+    total_exposure=1,
+    max_exposure=None,
+    min_exposure=None,
+    trading_lag_days=1,
+)
+
+preprocessor, runner = initialize(
+    dataset=DATASET,
+    trading_config=trading_config,
+    topn=TOP_N,
+    rebal_freq=REBAL_FREQ,
+)
 
 
 class ShrinkageGP:
@@ -196,7 +161,7 @@ class ShrinkageGP:
 import gc
 from tqdm import tqdm
 
-available_dates = runner.returns.simple_returns.loc["1994-07-27":].index
+available_dates = runner.returns.simple_returns.loc["1982-01-01":].index
 
 last_date = available_dates[-1]
 
@@ -204,7 +169,7 @@ optimal = []
 i = 0
 for date in available_dates:
     start_date = date
-    end_date = runner.returns.simple_returns.loc[start_date:].iloc[20:].index[0]
+    end_date = date + pd.DateOffset(months=1)
 
     if end_date > last_date:
         break
@@ -215,7 +180,7 @@ for date in available_dates:
     )
     opt_ra = opt()
     print(
-        f"Date: {start_date}, Volatility: {-opt.optimal_sharpe * np.sqrt(252):.6f}, Naive Volatility: {-opt.optimize(0.1) * np.sqrt(252):.6f}, Shrinkage: {opt_ra:.2f}"
+        f"Start Date: {start_date}, End Date: {end_date}, Volatility: {-opt.optimal_sharpe * np.sqrt(252):.6f}, Naive Volatility: {-opt.optimize(0.1) * np.sqrt(252):.6f}, Shrinkage: {opt_ra:.2f}"
     )
 
     optimal.append(

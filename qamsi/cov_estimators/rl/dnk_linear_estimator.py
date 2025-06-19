@@ -5,21 +5,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pandas as pd
 
+import numpy as np
+
 from sklearn.linear_model import ElasticNetCV
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit
 
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
 class DNKLinearCovEstimator(BaseRLCovEstimator):
-    def __init__(self, shrinkage_type: str) -> None:
-        super().__init__(shrinkage_type=shrinkage_type)
-
-        self.enet = ElasticNetCV(
-            cv=TimeSeriesSplit(n_splits=5),
-            alphas=[0.5, 1.0, 1.5, 2.0, 5.0],
-            l1_ratio=[0.1, 0.25, 0.5, 0.75, 0.9],
-        )
+    def __init__(self, shrinkage_type: str, window_size: int | None = None) -> None:
+        super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
 
         self.last_pred = None
         self.encountered_nan = False
@@ -29,7 +26,15 @@ class DNKLinearCovEstimator(BaseRLCovEstimator):
     ) -> None:
         if shrinkage_target.isna().any():
             self.encountered_nan = True
+            print(
+                f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target."
+            )
         else:
+            self.enet = ElasticNetCV(
+                cv=TimeSeriesSplit(n_splits=5),
+                alphas=[0.5, 1.0, 1.5, 2.0, 5.0],
+                l1_ratio=[0.1, 0.25, 0.5, 0.75, 0.9],
+            )
             self.enet.fit(X=features, y=shrinkage_target)
             self.encountered_nan = False
 
