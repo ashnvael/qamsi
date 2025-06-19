@@ -74,7 +74,7 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     END_DATE: pd.Timestamp = field(
-        default=pd.to_datetime("2024-08-30"),
+        default=pd.to_datetime("2024-07-31"),
         metadata={"docs": "Date to end train (as per paper by DNK)"},
     )
 

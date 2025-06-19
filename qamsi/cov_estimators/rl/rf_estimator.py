@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import pandas as pd
-
-from sklearn.ensemble import RandomForestRegressor
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.preprocessing import KBinsDiscretizer
 
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
 class RandomForestCovEstimator(BaseRLCovEstimator):
-    def __init__(self, shrinkage_type: str, window_size: int | None = None) -> None:
+    SHRINKAGE_PRECISION = 100
+
+    def __init__(self, shrinkage_type: str, as_classifier: bool = False, window_size: int | None = None) -> None:
         super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
+
+        self.as_classifier = as_classifier
 
         self.last_pred = None
         self.encountered_nan = False
@@ -26,12 +27,25 @@ class RandomForestCovEstimator(BaseRLCovEstimator):
                 f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target."
             )
         else:
-            self.rf = RandomForestRegressor(
-                n_estimators=30,
-                max_depth=10,
-                random_state=12,
-            )
-            self.rf.fit(X=features, y=shrinkage_target)
+            if self.as_classifier:
+                discretizer = KBinsDiscretizer(n_bins=self.SHRINKAGE_PRECISION, encode="ordinal", strategy="uniform")
+                shrinkage_transf = discretizer.fit_transform(shrinkage_target.values.reshape(-1, 1)).ravel()
+                shrinkage_target = pd.Series(shrinkage_transf, index=shrinkage_target.index).astype(int)
+
+                self.rf = RandomForestClassifier(
+                    n_estimators=30,
+                    max_depth=10,
+                    random_state=12,
+                )
+                self.rf.fit(X=features, y=shrinkage_target)
+            else:
+                self.rf = RandomForestRegressor(
+                    n_estimators=30,
+                    max_depth=10,
+                    random_state=12,
+                )
+                self.rf.fit(X=features, y=shrinkage_target)
+
             self.encountered_nan = False
 
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:

@@ -180,4 +180,30 @@ class VarianceMinimizer(Optimization):
         return None
 
     def solve(self) -> None:
-        return super().solve()
+        GhAb = self.constraints.to_GhAb()
+        if GhAb['G'] is None and self.constraints.box["box_type"] == "Unbounded":
+            A = GhAb['A']
+            b = GhAb['b']
+            # If b is scalar, convert it to a 1D array
+            if isinstance(b, (int, float)):
+                b = np.array([b])
+            elif b.ndim == 0:
+                b = np.array([b])
+
+            P = self.objective.coefficients['P']
+            P_inv = np.linalg.inv(P)
+
+            AP_invA = A @ P_inv @ A.T
+            if AP_invA.shape[0] > 1:
+                AP_invA_inv = np.linalg.inv(AP_invA)
+            else:
+                AP_invA_inv = 1 / AP_invA
+            x = pd.Series(P_inv @ A.T @ AP_invA_inv @ b,
+                          index=self.constraints.ids)
+            self.results.update({
+                'weights': x.to_dict(),
+                'status': True,
+            })
+            return None
+        else:
+            return super().solve()

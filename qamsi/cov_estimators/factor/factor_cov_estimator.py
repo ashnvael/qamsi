@@ -66,3 +66,13 @@ class FactorCovEstimator(BaseCovEstimator):
         )
 
         return covmat.astype(float)
+
+    @property
+    def available_assets(self) -> list[str]:
+        return self._available_assets
+
+    @available_assets.setter
+    def available_assets(self, available_assets: list[str]) -> None:
+        self._available_assets = available_assets
+        self.factor_cov_estimator.available_assets = available_assets
+        self.residual_cov_estimator.available_assets = available_assets

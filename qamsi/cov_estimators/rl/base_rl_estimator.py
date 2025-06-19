@@ -71,8 +71,14 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
 
         last_pred = self.predictions
 
-        first_date = target.dropna(how="any").first_valid_index()
-        last_date = target.dropna(how="any").last_valid_index()
+        first_feat_date = feat.dropna(axis=0, how="any").first_valid_index()
+        last_feat_date = feat.dropna(axis=0, how="any").last_valid_index()
+
+        first_target_date = target.dropna(axis=0, how="any").first_valid_index()
+        last_target_date = target.dropna(axis=0, how="any").last_valid_index()
+
+        first_date = first_feat_date if first_feat_date >= first_target_date else first_target_date
+        last_date = last_feat_date if last_target_date >= last_feat_date else last_target_date
 
         feat = feat.loc[first_date:last_date]
         if not last_pred.empty:
@@ -94,11 +100,13 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
 
         target = target.loc[first_date:last_date]
 
-        feat = self.feat_scaler.fit_transform(feat)
-        target_transformed = self.target_scaler.fit_transform(
-            target.values.reshape(-1, 1)
-        )
-        target = pd.Series(target_transformed.reshape(-1), index=target.index)
+        feat_transf = self.feat_scaler.fit_transform(feat)
+        feat = pd.DataFrame(feat_transf, index=feat.index, columns=feat.columns)
+
+        # target_transformed = self.target_scaler.fit_transform(
+        #     target.values.reshape(-1, 1)
+        # )
+        # target = pd.Series(target_transformed.reshape(-1), index=target.index)
 
         self._fit_shrinkage(features=feat, shrinkage_target=target)
 
@@ -107,10 +115,12 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         if not self.predictions.empty and self.trained_with_features:
             feat["prediction"] = self.predictions.iloc[-1].item()
         feat_transformed = self.feat_scaler.transform(feat)
-        pred_shrinkage = self._predict_shrinkage(feat_transformed)
-        pred_shrinkage = self.target_scaler.inverse_transform(
-            np.array([pred_shrinkage]).reshape(-1, 1)
-        )[0][0]
+        feat = pd.DataFrame(feat_transformed, index=feat.index, columns=feat.columns)
+
+        pred_shrinkage = self._predict_shrinkage(feat)
+        # pred_shrinkage = self.target_scaler.inverse_transform(
+        #     np.array([pred_shrinkage]).reshape(-1, 1)
+        # )[0][0]
         pred_shrinkage = (
             np.clip(pred_shrinkage, 0, 1)
             if self.shrinkage_type == ShrinkageType.LINEAR

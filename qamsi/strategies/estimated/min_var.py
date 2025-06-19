@@ -66,7 +66,15 @@ class MinVariance(BaseStrategy):
     def _optimize(self, covmat: pd.DataFrame) -> pd.Series[float]:
         constraints = Constraints(ids=self.available_assets)
 
+        if self.trading_config.min_exposure is None or self.trading_config.max_exposure is None:
+            constr_type = "Unbounded"
+        elif self.trading_config.min_exposure >= 0:
+            constr_type = "LongOnly"
+        else:
+            constr_type = "LongShort"
+
         constraints.add_box(
+            box_type=constr_type,
             lower=self.trading_config.min_exposure,
             upper=self.trading_config.max_exposure,
         )

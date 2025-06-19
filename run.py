@@ -42,6 +42,7 @@ TRADING_CONFIG = TradingConfig(
 
 def initialize(
         dataset: Dataset,
+        with_causal_window: bool = True,
         start: str | None = None,
         end: str | None = None,
         trading_config: TradingConfig = TRADING_CONFIG,
@@ -52,6 +53,9 @@ def initialize(
 
     experiment_config.N_LOOKBEHIND_PERIODS = None
     experiment_config.REBALANCE_FREQ = rebal_freq
+
+    if not with_causal_window:
+        experiment_config.CAUSAL_WINDOW_SIZE = None
 
     if start is not None:
         experiment_config.START_DATE = pd.Timestamp(start)

@@ -2,6 +2,7 @@ from enum import Enum
 
 from qamsi.cov_estimators.heuristic.hist_cov_estimator import HistoricalCovEstimator
 from qamsi.cov_estimators.factor.factor_cov_estimator import FactorCovEstimator
+from qamsi.cov_estimators.rl.last_optimal_estimator import LastOptimalCovEstimator
 
 from qamsi.cov_estimators.shrinkage.diag_hist_cov_estimator import (
     DiagHistoricalCovEstimator,
@@ -39,6 +40,7 @@ class CovEstimators(Enum):
     GLASSO_TSCV = GLassoTSCVCovEstimator
 
     MA = MALinearCovEstimator
+    LAST_OPTIMAL = LastOptimalCovEstimator
     DNK = DNKLinearCovEstimator
     GPR = GPRLinearCovEstimator
     PRETRAINED = PretrainedCovEstimator

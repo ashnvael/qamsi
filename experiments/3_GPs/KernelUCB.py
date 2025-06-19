@@ -13,47 +13,20 @@ from qamsi.config.trading_config import TradingConfig
 from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
 from qamsi.cov_estimators.cov_estimators import CovEstimators
-from run import Dataset
+from run import Dataset, initialize
 
 
-DATASET = Dataset.SPX_US
+REBAL_FREQ = "ME"
+DATASET = Dataset.TOPN_US
+TOP_N = 30
+ESTIMATION_WINDOW = 365
 
-
-def get_runner() -> Runner:
-    experiment_config = DATASET.value()
-
-    stocks = tuple(
-        pd.read_csv(
-            experiment_config.PATH_OUTPUT / experiment_config.STOCKS_LIST_FILENAME
-        )
-        .iloc[:, 0]
-        .astype(str)
-        .tolist(),
-    )
-    experiment_config.ASSET_UNIVERSE = stocks  # type: ignore  # noqa: PGH003
-
-    experiment_config.START_DATE = "1981-01-02"
-    experiment_config.MIN_ROLLING_PERIODS = 252
-    experiment_config.REBALANCE_FREQ = "ME"
-
-    factors = pd.read_csv(experiment_config.PATH_OUTPUT / "factors.csv")
-    factors["date"] = pd.to_datetime(factors["date"])
-    factors = factors.set_index("date")
-    factor_names = tuple(factors.columns.astype(str).tolist())
-    experiment_config.FACTORS = factor_names
-
-    trading_config = TradingConfig(
-        total_exposure=1,
-        max_exposure=1,
-        min_exposure=0,
-        trading_lag_days=1,
-    )
-
-    return Runner(
-        experiment_config=experiment_config,
-        trading_config=trading_config,
-        verbose=False,
-    )
+TRADING_CONFIG = TradingConfig(
+    total_exposure=1,
+    max_exposure=None,
+    min_exposure=None,
+    trading_lag_days=1,
+)
 
 
 class BanditEnvironment:
@@ -188,9 +161,13 @@ def train(start_date: str | None = "1982-01-01"):
     start_date = pd.Timestamp(start_date) if start_date else None
     train_end = pd.Timestamp("1999-12-31")
 
-    runner = get_runner()
+    _, runner = initialize(
+        dataset=DATASET,
+        trading_config=TRADING_CONFIG,
+        topn=TOP_N,
+        rebal_freq=REBAL_FREQ,
+    )
     rebal_dates = runner.init_backtester().rebal_schedule
-    # lagged_rebal_dates = [date - pd.Timedelta(days=runner.trading_config.trading_lag_days) for date in rebal_dates]
 
     true_optimal = pd.read_csv("targets.csv")
     true_optimal["start_date"] = pd.to_datetime(true_optimal["start_date"])
@@ -200,8 +177,6 @@ def train(start_date: str | None = "1982-01-01"):
     true_optimal_train = true_optimal.loc[true_optimal.index < train_end]
     min_reward = true_optimal_train["reward"].min()
     max_reward = true_optimal_train["reward"].max()
-    # min_reward = None
-    # max_reward = None
     if min_reward is not None and max_reward is not None:
         true_optimal["reward"] = (true_optimal["reward"] - min_reward) / (
             max_reward - min_reward
@@ -219,7 +194,7 @@ def train(start_date: str | None = "1982-01-01"):
     optimal_grid = np.append(optimal_grid, np.array([1.0]))
 
     agent = KernelUCB(
-        len(optimal_grid), env.n_features, alpha=1.0, kernel="linear", gamma=0.5
+        len(optimal_grid), env.n_features, alpha=1.0, kernel="rbf", gamma=0.5
     )
 
     # initialize CGP-UCB
@@ -264,7 +239,7 @@ def train(start_date: str | None = "1982-01-01"):
             )
 
             optimal_values.append(true_optimal_value)
-            if t % 20 == 0 and t > 0:
+            if t % 300 == 0 and t > 0:
                 plot_regret(rewards, optimal_values)
 
             if current_date in rebal_dates:

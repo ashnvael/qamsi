@@ -97,13 +97,7 @@ class Runner:
         self.returns = Returns(self.data.loc[:, asset_universe])
         self.rf = self.data[self.experiment_config.RF_NAME]
 
-        self.targets = (
-            self.data.loc[
-                self.data.index.intersection(set(self.experiment_config.TARGETS))
-            ]
-            if self.data.columns.isin(self.experiment_config.TARGETS).any()
-            else pd.DataFrame(index=self.data.index)
-        )
+        self.targets = self.data[self.data.columns.intersection(set(self.experiment_config.TARGETS))]
 
         # Factors are passed as excess returns
         self.factors = self.data.loc[:, self.experiment_config.FACTORS]
