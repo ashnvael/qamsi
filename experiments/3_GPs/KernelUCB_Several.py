@@ -21,6 +21,8 @@ DATASET = Dataset.TOPN_US
 TOP_N = 30
 ESTIMATION_WINDOW = 365
 
+N_RESAMPLES = 10
+
 TRADING_CONFIG = TradingConfig(
     total_exposure=1,
     max_exposure=None,
@@ -95,9 +97,7 @@ class BanditEnvironment:
         closest_date_index = self.features.index.asof(date)
         return self.features.loc[closest_date_index].fillna(0).to_numpy()
 
-    def step(self, action: float) -> tuple[np.ndarray, float]:
-        self._action_hist.append([self.current_end, action])
-
+    def sample_reward(self, action: float) -> float:
         estimator = CovEstimators.RISKFOLIO.value(
             alpha=action,
             estimator_type="shrunk",
@@ -116,15 +116,28 @@ class BanditEnvironment:
             strategy=strategy,
         )
 
-        self.current_id += 1
-        self.current_start = self.start_dates[self.current_id]
-        self.current_end = self.end_dates[self.current_id]
-
         reward = -fitted_r.std().item()
         if self.min_reward is not None and self.max_reward is not None:
+            if reward < self.min_reward:
+                self.min_reward = reward
+
+            if reward > self.max_reward:
+                self.max_reward = reward
+
             reward = reward - self.min_reward
             reward /= self.max_reward - self.min_reward
             reward = np.clip(reward, 0.0, 1.0)
+
+        return reward
+
+    def step(self, action: float) -> tuple[np.ndarray, float]:
+        self._action_hist.append([self.current_end, action])
+
+        reward = self.sample_reward(action)
+
+        self.current_id += 1
+        self.current_start = self.start_dates[self.current_id]
+        self.current_end = self.end_dates[self.current_id]
 
         return self.get_context(), reward
 
@@ -190,11 +203,11 @@ def train(start_date: str | None = "1982-01-01"):
         train_end=train_end,
     )
 
-    optimal_grid = np.linspace(0.0, 1.0, 100, endpoint=False)
+    optimal_grid = np.linspace(0.0, 1.0, 10, endpoint=False)
     optimal_grid = np.append(optimal_grid, np.array([1.0]))
 
     agent = KernelUCB(
-        len(optimal_grid), env.n_features, alpha=1.0, kernel="linear", gamma=0.5
+        len(optimal_grid), env.n_features, alpha=2.0, kernel="rbf", gamma=0.5
     )
 
     # initialize CGP-UCB
@@ -202,59 +215,50 @@ def train(start_date: str | None = "1982-01-01"):
     optim = []
     context = env.reset()
     rewards = []
-    optimal_values = []
+    prod_chosen_arm = None
     try:
-        for t in (pbar := tqdm(range(rounds))):
+        for t in tqdm(range(rounds)):
             current_date = env.get_current_date()
 
             if current_date in rebal_dates:
                 # TODO(@V): Causal window here!
                 agent.alpha = 0.0
+
+                chosen_arm = agent.select_arm(context)
+                prod_chosen_arm = chosen_arm
+
+                action = optimal_grid[chosen_arm].item()
+                reward = env.sample_reward(action)
+
+                agent.update(chosen_arm, context, reward)
+                optim.append([current_date, action])
             else:
-                agent.alpha = 1.0
+                agent.alpha = 2.0
+                prod_chosen_arm = None
 
-            chosen_arm = agent.select_arm(context)
-            action = optimal_grid[chosen_arm].item()
+            for chosen_arm in range(len(optimal_grid)):
+                if prod_chosen_arm is not None and chosen_arm == prod_chosen_arm:
+                    continue
 
-            context, reward = env.step(action)
+                action = optimal_grid[chosen_arm].item()
+                reward = env.sample_reward(action)
 
-            agent.update(chosen_arm, context, reward)
+                agent.update(chosen_arm, context, reward)
+
+                if chosen_arm == len(optimal_grid) - 1:
+                    context, reward = env.step(action)
 
             rewards.append(reward)
             # avg_reward = total_reward / (t + 1)
 
-            true_optimal_action = (
-                true_optimal.loc[current_date, "shrinkage"]
-                if current_date in true_optimal.index
-                else 0.0
-            )
-            true_optimal_value = (
-                true_optimal.loc[current_date, "reward"]
-                if current_date in true_optimal.index
-                else 0.0
-            )
-
-            pbar.set_description(
-                f"Date: {current_date}, Action: {action:.6f}, Optimal Action: {true_optimal_action:.6f}, Reward: {reward:.6f}, Optimal Reward: {true_optimal_value:.6f}"
-            )
-
-            optimal_values.append(true_optimal_value)
-            if t % 300 == 0 and t > 0:
-                plot_regret(rewards, optimal_values)
-
-            if current_date in rebal_dates:
-                optim.append([current_date, action])
-
-            # optim.append([current_date, action])
-
             if t % 20 == 0:
-                env.action_hist.to_csv("cgp_ucb.csv", index=True, header=True)
+                env.action_hist.to_csv("cgp_ucb_all.csv", index=True, header=True)
 
         optim = pd.DataFrame(optim, columns=["date", "cgp_ucb"]).set_index("date")
-        optim.to_csv("cgp_ucb_gmv.csv", index=True, header=True)
+        optim.to_csv("cgp_ucb_all.csv", index=True, header=True)
     except:
         optim = pd.DataFrame(optim, columns=["date", "cgp_ucb"]).set_index("date")
-        optim.to_csv("cgp_ucb_gmv.csv", index=True, header=True)
+        optim.to_csv("cgp_ucb_all.csv", index=True, header=True)
 
 
 if __name__ == "__main__":
