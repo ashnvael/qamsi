@@ -10,9 +10,10 @@ from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 class RandomForestCovEstimator(BaseRLCovEstimator):
     SHRINKAGE_PRECISION = 100
 
-    def __init__(self, shrinkage_type: str, as_classifier: bool = False, window_size: int | None = None) -> None:
+    def __init__(self, shrinkage_type: str, trading_lag: int = 0, as_classifier: bool = False, window_size: int | None = None) -> None:
         super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
 
+        self.trading_lag = trading_lag
         self.as_classifier = as_classifier
 
         self.last_pred = None
@@ -27,6 +28,10 @@ class RandomForestCovEstimator(BaseRLCovEstimator):
                 f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target."
             )
         else:
+            if self.trading_lag > 0:
+                features = features.shift(self.trading_lag).iloc[self.trading_lag:]
+                shrinkage_target = shrinkage_target.iloc[self.trading_lag:]
+
             if self.as_classifier:
                 discretizer = KBinsDiscretizer(n_bins=self.SHRINKAGE_PRECISION, encode="ordinal", strategy="uniform")
                 shrinkage_transf = discretizer.fit_transform(shrinkage_target.values.reshape(-1, 1)).ravel()
