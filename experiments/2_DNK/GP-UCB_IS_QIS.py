@@ -14,7 +14,7 @@ from run import Dataset, initialize
 
 REBAL_FREQ = "ME"
 DATASET = Dataset.TOPN_US
-TOP_N = 30
+TOP_N = 50
 ESTIMATION_WINDOW = 365
 
 trading_config = TradingConfig(
@@ -37,14 +37,15 @@ class ShrinkageGP:
         self,
         start: pd.Timestamp,
         end: pd.Timestamp,
-        max_shrinkage: float = 1,
+        min_shrinkage: float = 0.5,
+        max_shrinkage: float = 2,
         max_iterations: int = 10,
         acq_beta: float = 1.96,
     ) -> None:
         self.start = start
         self.end = end
         self.acq_beta = acq_beta
-        self._domain_ra = (0, max_shrinkage)
+        self._domain_ra = (min_shrinkage, max_shrinkage)
         self.max_iterations = max_iterations
 
         self.previous_points = []
@@ -181,14 +182,14 @@ for date in available_dates:
     )
 
     optimal.append(
-        [start_date, end_date, -opt.optimal_sharpe, -opt.optimize(0.1), opt_ra]
+        [start_date, end_date, -opt.optimal_sharpe, -opt.optimize(1), opt_ra]
     )
 
     if i % 20 == 0:
         optimal_df = pd.DataFrame(
             optimal, columns=["start_date", "end_date", "vol", "naive_vol", "shrinkage"]
         ).set_index("start_date")
-        optimal_df.to_csv("targets.csv", index=True, header=True)
+        optimal_df.to_csv(f"QIS_targets_{TOP_N}.csv", index=True, header=True)
 
     gc.collect()
     del opt
@@ -198,4 +199,4 @@ for date in available_dates:
 optimal_df = pd.DataFrame(
     optimal, columns=["start_date", "end_date", "vol", "naive_vol", "shrinkage"]
 ).set_index("start_date")
-optimal_df.to_csv("targets.csv", index=True, header=True)
+optimal_df.to_csv(f"QIS_targets_{TOP_N}.csv", index=True, header=True)

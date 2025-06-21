@@ -8,7 +8,9 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from qamsi.strategies.optimization_data import PredictionData, TrainingData
+from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.cov_estimators.shrinkage.rp_cov_estimator import RiskfolioCovEstimator
+from qamsi.cov_estimators.shrinkage.qis import QISCovEstimator
 
 
 class ShrinkageType(Enum):
@@ -16,22 +18,23 @@ class ShrinkageType(Enum):
     QIS = "qis"
 
 
-class BaseRLCovEstimator(RiskfolioCovEstimator):
+class BaseRLCovEstimator(BaseCovEstimator):
     def __init__(
         self, shrinkage_type: str = "linear", window_size: int | None = None
     ) -> None:
+        super().__init__()
+
         self.shrinkage_type = ShrinkageType(shrinkage_type)
         self.window_size = window_size
 
         self.feat_scaler = StandardScaler()
-        self.target_scaler = StandardScaler()
 
-        # TODO(@V): Implement DNK QIS
         if self.shrinkage_type == ShrinkageType.QIS:
-            msg = "QIS shrinkage not yet implemented"
-            raise NotImplementedError(msg)
+            self.shrinkage = QISCovEstimator(
+                shrinkage=1.0,  # Starting shrinkage, will be updated during fit
+            )
         elif self.shrinkage_type == ShrinkageType.LINEAR:
-            super().__init__(
+            self.shrinkage = RiskfolioCovEstimator(
                 estimator_type="shrunk",
                 alpha=0.1,  # Starting alpha, will be updated during fit
             )
@@ -39,7 +42,6 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
             msg = f"Unknown shrinkage type: {self.shrinkage_type}"
             raise NotImplementedError(msg)
 
-        self._fitted_cov = None
         self._seen_training_data = None
 
         self._predictions = []
@@ -59,7 +61,14 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         self._seen_training_data = training_data
 
         feat = training_data.features
-        target = training_data.targets["target"]
+
+        if self.shrinkage_type == ShrinkageType.LINEAR:
+            target = training_data.targets["target"]
+        elif self.shrinkage_type == ShrinkageType.QIS:
+            target = training_data.targets["qis_shrinkage"]
+        else:
+            msg = f"Unknown shrinkage type: {self.shrinkage_type}"
+            raise NotImplementedError(msg)
 
         start_date = (
             target.index[-1] - pd.Timedelta(days=self.window_size)
@@ -103,11 +112,7 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         feat_transf = self.feat_scaler.fit_transform(feat)
         feat = pd.DataFrame(feat_transf, index=feat.index, columns=feat.columns)
 
-        # target_transformed = self.target_scaler.fit_transform(
-        #     target.values.reshape(-1, 1)
-        # )
-        # target = pd.Series(target_transformed.reshape(-1), index=target.index)
-
+        self.shrinkage.available_assets = self.available_assets
         self._fit_shrinkage(features=feat, shrinkage_target=target)
 
     def _predict(self, prediction_data: PredictionData) -> pd.DataFrame:
@@ -118,23 +123,28 @@ class BaseRLCovEstimator(RiskfolioCovEstimator):
         feat = pd.DataFrame(feat_transformed, index=feat.index, columns=feat.columns)
 
         pred_shrinkage = self._predict_shrinkage(feat)
-        # pred_shrinkage = self.target_scaler.inverse_transform(
-        #     np.array([pred_shrinkage]).reshape(-1, 1)
-        # )[0][0]
+
         pred_shrinkage = (
             np.clip(pred_shrinkage, 0, 1)
             if self.shrinkage_type == ShrinkageType.LINEAR
             else pred_shrinkage
         )
-        self.alpha = pred_shrinkage
+
+        if self.shrinkage_type == ShrinkageType.LINEAR:
+            self.shrinkage.alpha = pred_shrinkage
+        elif self.shrinkage_type == ShrinkageType.QIS:
+            self.shrinkage.shrinkage = pred_shrinkage
+        else:
+            msg = f"Unknown shrinkage type: {self.shrinkage_type}"
+            raise NotImplementedError(msg)
 
         self._predictions.append([feat.index[-1], pred_shrinkage])
 
-        super()._fit(training_data=self._seen_training_data)
+        self.shrinkage.fit(training_data=self._seen_training_data)
 
         self._seen_training_data = None
 
-        return self._fitted_cov
+        return self.shrinkage.predict(prediction_data=prediction_data)
 
     @property
     def predictions(self) -> pd.DataFrame | None:

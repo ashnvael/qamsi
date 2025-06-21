@@ -62,7 +62,7 @@ Created on Sun Sep 11 15:18:30 2021
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###########################################################################
-def _QIS(Y, k=None):
+def _QIS(Y, shrinkage: float = 1.0, k: int | None = None) -> pd.DataFrame:
     # Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
     #    None, np.nan or int
     # Post-Condition: Sigmahat dataframe is returned
@@ -133,6 +133,21 @@ def _QIS(Y, k=None):
 
     deltaQIS = delta * (sum(lambda1) / sum(delta))  # preserve trace
 
+    init_delta = deltaQIS.copy()
+    deltaQIS = shrinkage * init_delta + (1 - shrinkage) * lambda1.to_numpy()
+
+    # Apply isotonic regression by (De Nard & Kostovic, 2025)
+    smallest = np.min(init_delta[init_delta < lambda1])
+    largest = np.max(init_delta[init_delta > lambda1])
+    crossing_point = (smallest + largest) / 2
+
+    deltaQIS[-1] = np.maximum(deltaQIS[-1], crossing_point)
+    for i in range(0, len(deltaQIS) - 1)[::-1]:
+        if init_delta[i] < lambda1[i]:
+            deltaQIS[i] = np.maximum(np.minimum(deltaQIS[i], deltaQIS[i + 1]), crossing_point)
+        else:
+            deltaQIS[i] = np.minimum(np.minimum(deltaQIS[i], deltaQIS[i + 1]), crossing_point)
+
     temp1 = dfu.to_numpy()
     temp2 = np.diag(deltaQIS)
     temp3 = dfu.T.to_numpy().conjugate()
@@ -142,8 +157,10 @@ def _QIS(Y, k=None):
 
 
 class QISCovEstimator(BaseCovEstimator):
-    def __init__(self) -> None:
+    def __init__(self, shrinkage: float = 1.0) -> None:
         super().__init__()
+
+        self.shrinkage = shrinkage
 
         self._fitted_vols = None
         self._fitted_corr = None
@@ -154,7 +171,7 @@ class QISCovEstimator(BaseCovEstimator):
     def _fit(self, training_data: TrainingData) -> None:
         ret = training_data.simple_excess_returns
 
-        self._fitted_cov = _QIS(ret, k=1)
+        self._fitted_cov = _QIS(ret, shrinkage=self.shrinkage, k=1)
         self._fitted_cov.index = self.available_assets
         self._fitted_cov.columns = self.available_assets
 

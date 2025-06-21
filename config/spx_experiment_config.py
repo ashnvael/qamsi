@@ -134,6 +134,8 @@ class ExperimentConfig(BaseExperimentConfig):
             "cgp_ucb",
             "irl",
             "irl_gail",
+            "qis_shrinkage",
+            "qis_vol",
         ),
         metadata={"docs": "ML Targets"},
     )

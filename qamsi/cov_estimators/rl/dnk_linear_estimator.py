@@ -5,10 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pandas as pd
 
-import numpy as np
-
 from sklearn.linear_model import ElasticNetCV
-from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit
 
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
