@@ -133,6 +133,7 @@ class ExperimentConfig(BaseExperimentConfig):
             "target",
             "cgp_ucb",
             "irl",
+            "irl_gail",
         ),
         metadata={"docs": "ML Targets"},
     )
