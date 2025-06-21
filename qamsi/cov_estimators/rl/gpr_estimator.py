@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
-class GPRLinearCovEstimator(BaseRLCovEstimator):
+class GPRCovEstimator(BaseRLCovEstimator):
     def __init__(
         self, shrinkage_type: str, kernel=DotProduct(), window_size: int | None = None
     ) -> None:

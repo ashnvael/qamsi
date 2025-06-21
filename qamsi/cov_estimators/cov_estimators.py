@@ -15,9 +15,9 @@ from qamsi.cov_estimators.ml.predictors.sklearn_ml_predictor import SklearnMlPre
 from qamsi.cov_estimators.ml.glasso_estimator import GLassoCovEstimator
 from qamsi.cov_estimators.ml.glasso_tscv_estimator import GLassoTSCVCovEstimator
 
-from qamsi.cov_estimators.rl.ma_linear_estimator import MALinearCovEstimator
-from qamsi.cov_estimators.rl.dnk_linear_estimator import DNKLinearCovEstimator
-from qamsi.cov_estimators.rl.gpr_linear_estimator import GPRLinearCovEstimator
+from qamsi.cov_estimators.rl.ma_estimator import MACovEstimator
+from qamsi.cov_estimators.rl.dnk_estimator import DNKCovEstimator
+from qamsi.cov_estimators.rl.gpr_estimator import GPRCovEstimator
 from qamsi.cov_estimators.rl.pretrained_estimator import PretrainedCovEstimator
 from qamsi.cov_estimators.rl.uncert_ensemble_estimator import UncertEnsembleCovEstimator
 
@@ -39,10 +39,10 @@ class CovEstimators(Enum):
     GLASSO = GLassoCovEstimator
     GLASSO_TSCV = GLassoTSCVCovEstimator
 
-    MA = MALinearCovEstimator
+    MA = MACovEstimator
     LAST_OPTIMAL = LastOptimalCovEstimator
-    DNK = DNKLinearCovEstimator
-    GPR = GPRLinearCovEstimator
+    DNK = DNKCovEstimator
+    GPR = GPRCovEstimator
     PRETRAINED = PretrainedCovEstimator
     UNCERT_ENSEMBLE = UncertEnsembleCovEstimator
 

@@ -10,7 +10,7 @@ import numpy as np
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
-class MALinearCovEstimator(BaseRLCovEstimator):
+class MACovEstimator(BaseRLCovEstimator):
     def __init__(self, shrinkage_type: str) -> None:
         super().__init__(shrinkage_type=shrinkage_type)
 
