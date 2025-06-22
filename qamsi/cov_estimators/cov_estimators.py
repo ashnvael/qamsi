@@ -22,6 +22,7 @@ from qamsi.cov_estimators.rl.pretrained_estimator import PretrainedCovEstimator
 from qamsi.cov_estimators.rl.uncert_ensemble_estimator import UncertEnsembleCovEstimator
 
 from qamsi.cov_estimators.rl.rf_estimator import RandomForestCovEstimator
+from qamsi.cov_estimators.rl.dl_estimator import DLCovEstimator
 
 
 class CovEstimators(Enum):
@@ -47,3 +48,4 @@ class CovEstimators(Enum):
     UNCERT_ENSEMBLE = UncertEnsembleCovEstimator
 
     RF = RandomForestCovEstimator
+    DEEP_LEARNING = DLCovEstimator
