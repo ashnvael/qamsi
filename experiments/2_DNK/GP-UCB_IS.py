@@ -14,7 +14,7 @@ from run import Dataset, initialize
 
 REBAL_FREQ = "ME"
 DATASET = Dataset.TOPN_US
-TOP_N = 30
+TOP_N = 500
 ESTIMATION_WINDOW = 365
 
 trading_config = TradingConfig(
@@ -191,7 +191,7 @@ for date in available_dates:
         optimal_df = pd.DataFrame(
             optimal, columns=["start_date", "end_date", "vol", "naive_vol", "shrinkage"]
         ).set_index("start_date")
-        optimal_df.to_csv("targets.csv", index=True, header=True)
+        optimal_df.to_csv(f"targets_{TOP_N}.csv", index=True, header=True)
 
     gc.collect()
     del opt
@@ -201,4 +201,4 @@ for date in available_dates:
 optimal_df = pd.DataFrame(
     optimal, columns=["start_date", "end_date", "vol", "naive_vol", "shrinkage"]
 ).set_index("start_date")
-optimal_df.to_csv("targets.csv", index=True, header=True)
+optimal_df.to_csv(f"targets_{TOP_N}.csv", index=True, header=True)

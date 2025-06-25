@@ -13,7 +13,7 @@ qs.extend_pandas()
 REBAL_FREQ = "ME"
 TOP_N = 30
 DATASET = Dataset.TOPN_US
-ESTIMATOR = CovEstimators.RF.value(shrinkage_type="linear")
+ESTIMATOR = CovEstimators.PRETRAINED.value(name="irl")
 BASELINE = EWStrategy()
 
 dataset = DATASET.value(topn=TOP_N)
@@ -27,23 +27,23 @@ rf = strategy["acc_rate"]
 strategy_total_r = strategy["strategy_xs_r"].add(rf, axis=0)
 bm = strategy["spx"].add(rf, axis=0).rename("spx")
 
-# qs.plots.snapshot(strategy_total_r, title=strategy_name, show=True)
-#
-# qs.plots.monthly_heatmap(
-#     strategy_total_r,
-#     benchmark=strategy["spx"].add(rf, axis=0),
-#     figsize=(12, 8),
-#     show=True,
-#     savefig=f"{dataset.SAVE_PATH}/monthly_{strategy_name}.pdf",
-# )
-#
-# qs.plots.drawdowns_periods(
-#     strategy_total_r,
-#     title=strategy_name,
-#     figsize=(12, 8),
-#     show=True,
-#     savefig=f"{dataset.SAVE_PATH}/drawdowns_{strategy_name}.pdf",
-# )
+qs.plots.snapshot(strategy_total_r, title="AIRL", show=True)
+
+qs.plots.monthly_heatmap(
+    strategy_total_r,
+    benchmark=strategy["spx"].add(rf, axis=0),
+    figsize=(12, 8),
+    show=True,
+    savefig=f"{dataset.SAVE_PATH}/monthly_{strategy_name}.pdf",
+)
+
+qs.plots.drawdowns_periods(
+    strategy_total_r,
+    title="AIRL",
+    figsize=(12, 8),
+    show=True,
+    savefig=f"{dataset.SAVE_PATH}/drawdowns_{strategy_name}.pdf",
+)
 
 day_diff = strategy_total_r.index.diff().days
 factor_annual = round(np.nanmean(365 // day_diff))

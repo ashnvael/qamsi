@@ -17,11 +17,13 @@ from qamsi.cov_estimators.ml.glasso_tscv_estimator import GLassoTSCVCovEstimator
 
 from qamsi.cov_estimators.rl.ma_estimator import MACovEstimator
 from qamsi.cov_estimators.rl.dnk_estimator import DNKCovEstimator
+from qamsi.cov_estimators.rl.ols_estimator import OLSCovEstimator
 from qamsi.cov_estimators.rl.gpr_estimator import GPRCovEstimator
 from qamsi.cov_estimators.rl.pretrained_estimator import PretrainedCovEstimator
 from qamsi.cov_estimators.rl.uncert_ensemble_estimator import UncertEnsembleCovEstimator
 
 from qamsi.cov_estimators.rl.rf_estimator import RandomForestCovEstimator
+from qamsi.cov_estimators.rl.xgb_estimator import XGBCovEstimator
 from qamsi.cov_estimators.rl.dl_estimator import DLCovEstimator
 
 
@@ -43,9 +45,11 @@ class CovEstimators(Enum):
     MA = MACovEstimator
     LAST_OPTIMAL = LastOptimalCovEstimator
     DNK = DNKCovEstimator
+    OLS = OLSCovEstimator
     GPR = GPRCovEstimator
     PRETRAINED = PretrainedCovEstimator
     UNCERT_ENSEMBLE = UncertEnsembleCovEstimator
 
     RF = RandomForestCovEstimator
+    XGB = XGBCovEstimator
     DEEP_LEARNING = DLCovEstimator
