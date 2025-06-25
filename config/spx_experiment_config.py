@@ -106,7 +106,7 @@ class ExperimentConfig(BaseExperimentConfig):
     )
 
     CAUSAL_WINDOW_SIZE: int | None = field(
-        default=21,
+        default=30,
         metadata={"docs": "Number of datapoints that are not available at rebalancing"},
     )
 
