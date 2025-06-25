@@ -23,10 +23,11 @@ class Dataset(Enum):
 
 REBAL_FREQ = "ME"
 
-DATASET = Dataset.SPX_US
+TOP_N = 30
+DATASET = Dataset.TOPN_US
 
-ESTIMATION_WINDOW = 365 * 3
-ESTIMATOR = CovEstimators.GLASSO.value()
+ESTIMATION_WINDOW = 365 * 1
+ESTIMATOR = CovEstimators.DNK.value(shrinkage_type="linear", window_size=365 * 20)
 
 SAVE = True
 
@@ -83,7 +84,13 @@ def run_backtest() -> StrategyStatistics:
     print("Running backtest...")
     print(f"Estimation window: {ESTIMATION_WINDOW}")
 
-    preprocessor, runner = initialize(DATASET, TRADING_CONFIG, topn=100)
+    preprocessor, runner = initialize(
+        dataset=DATASET,
+        with_causal_window=True,
+        trading_config=TRADING_CONFIG,
+        rebal_freq=REBAL_FREQ,
+        topn=TOP_N,
+    )
     trading_config = TRADING_CONFIG
 
     strategy = MinVariance(
