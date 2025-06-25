@@ -1,5 +1,5 @@
 # Semester Project // Quantitative Asset Management & Systematic Investments, Spring 2025
-_Viacheslav Buchkov_,_Nikolai Kurlovich_\
+_Viacheslav Buchkov_, _Nikolai Kurlovich_\
 University of Zürich
 
 **Abstract**: De Nard and Kostovic (2025) present a novel approach to estimating the risk-optimized portfolio by learning the optimal shrinkage estimation, created by an "expert Oracle" in the supervised learning manner. Our paper shows that this Behavioral Cloning approach might be significantly improved by introducing Inverse Reinforcement Learning, where a policy is optimized to copy this "expert Oracle". Such an approach solves the issues of distributional shifts and cascading policy errors that are present in Behavior Cloning, resulting in suboptimal risk-optimized portfolios. Empirical experiments show that in fully out-of-sample construction our model improves on the existing results for linear shrinkage, providing a new data-driven approach to construct risk-optimized portfolios.
