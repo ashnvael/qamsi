@@ -9,7 +9,7 @@ University of Zürich
 ## Install
 
 ```
-[https://github.com/ashnvael/qamsi.git](https://github.com/ashnvael/qamsi.git)
+git clone https://github.com/ashnvael/qamsi.git
 ```
 
 ## New Covariance Estimator Example
