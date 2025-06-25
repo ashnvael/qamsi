@@ -91,12 +91,12 @@ ESTIMATOR = CovEstimators.DNK.value(shrinkage_type="linear", window_size=)
 
 # Specify the trading configurations
 trading_config = TradingConfig(
-    broker_fee=0,
-
-    total_exposure=1, # 
-    max_exposure=None,
-    min_exposure=None,
-    trading_lag_days=1,
+    broker_fee=0, # Broker commission in decimals
+    bid_ask_spread=0, # Bid-ask spread in decimals
+    total_exposure=1, # Budget constraint
+    max_exposure=None, # Maximum weight constraint
+    min_exposure=None, # Minimum weight constraint
+    trading_lag_days=1, # Trading Lag
 )
 
 preprocessor, runner = initialize(
@@ -106,6 +106,7 @@ preprocessor, runner = initialize(
     rebal_freq=REBAL_FREQ,
 )
 
+# Create a Minimum Variance strategy with optimization
 strategy = MinVariance(
     cov_estimator=ESTIMATOR,
     trading_config=trading_config,
@@ -119,5 +120,6 @@ result = runner(
     strategy=strategy,
     hedger=None,
 )
+# Get the backtesting metrics
 print(result)
 ```
