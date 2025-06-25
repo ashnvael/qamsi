@@ -12,7 +12,7 @@ University of Zürich
 git clone https://github.com/ashnvael/qamsi.git
 ```
 
-## New Covariance Estimator Example
+## How To Create A New Covariance Estimator
 
 ```
 from __future__ import annotations
@@ -41,7 +41,7 @@ class NewCovEstimator(BaseCovEstimator):
         ...
 ```
 
-## New Data-Driven Covariance Estimator Example
+## How To Create A New Data-Driven Covariance Estimator
 
 ```
 from __future__ import annotations
@@ -71,7 +71,7 @@ class NewRLCovEstimator(BaseRLCovEstimator):
         return pred
 ```
 
-## Backtest Example
+## How To Run A Backtest
 
 ```
 from qamsi.config.trading_config import TradingConfig
