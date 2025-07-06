@@ -14,7 +14,7 @@ CRSP_IGNORED_PLACEHOLDERS = [-66, -77, -88, -99]
 
 
 def _load_crsp_data(
-    config: BaseExperimentConfig, store: bool = True, store_mapping: bool = False
+    config: BaseExperimentConfig, store_mapping: bool = False
 ) -> pd.DataFrame:
     crsp_data = pd.read_csv(config.CRSP_PATH / config.CRSP_FILENAME)
     crsp_data = crsp_data.rename(columns={c: c.lower() for c in crsp_data.columns})
@@ -25,13 +25,10 @@ def _load_crsp_data(
     crsp_data = crsp_data.drop_duplicates(subset=["date", "permno"])
     crsp_data = crsp_data.set_index(["date", "permno"])
 
-    if store_mapping:
+    if store_mapping and (CRSP_MAPPING_FILENAME not in listdir(config.CRSP_PATH)):
         mapping = crsp_data.reset_index()[["permno", "comnam"]].drop_duplicates()
         mapping = mapping.set_index("permno")
         mapping.to_csv(config.PATH_OUTPUT / CRSP_MAPPING_FILENAME)
-
-    if store:
-        crsp_data.to_csv(config.PATH_TMP / config.CRSP_FULL_TMP_FILENAME)
 
     return crsp_data
 
@@ -52,10 +49,11 @@ def _create_top_liquid_presence_matrix(
     crsp_data: pd.DataFrame, topn: int
 ) -> pd.DataFrame:
     crsp_data["mktcap"] = crsp_data["shrout"] * 1_000 * crsp_data["prc"]
-    dolvol = crsp_data.reset_index().pivot(
+    dolvol_init = crsp_data.reset_index().pivot(
         index="date", columns="permno", values="mktcap"
     )
-    dolvol = dolvol.resample("ME").last()
+    dolvol = dolvol_init.resample("ME").last()
+    dolvol = pd.concat([dolvol_init.iloc[:1], dolvol], axis=0)
 
     presence_matrix = dolvol.apply(
         lambda x: x >= x.nlargest(topn).min(), axis=1
@@ -77,8 +75,10 @@ def _create_top_liquid_returns(
 ) -> None:
     try:
         crsp_data = pd.read_csv(config.PATH_TMP / config.CRSP_FULL_TMP_FILENAME)
+        crsp_data["date"] = pd.to_datetime(crsp_data["date"])
+        crsp_data = crsp_data.set_index(["date", "permno"])
     except FileNotFoundError:
-        crsp_data = _load_crsp_data(config, store=True, store_mapping=store_mapping)
+        crsp_data = _load_crsp_data(config, store_mapping=store_mapping)
 
     crsp_data = _filter_invalid_crsp_returns(crsp_data)
     presence_matrix = _create_top_liquid_presence_matrix(crsp_data, topn)
@@ -95,7 +95,7 @@ def _create_top_liquid_returns(
         config.PATH_OUTPUT / (f"top{topn}_" + config.RAW_DATA_FILENAME)
     )
     presence_matrix.to_csv(
-        config.PATH_OUTPUT / (f"top{topn}_" + config.PRESENCE_MATRIX_FILENAME)
+        config.PATH_OUTPUT / config.PRESENCE_MATRIX_FILENAME
     )
 
 
@@ -122,7 +122,7 @@ def _add_rf_rate_and_market_index(
     spx = spx.sort_index()
     spx = spx[["spx"]].pct_change()
 
-    rf = pd.read_excel(config.PATH_RF_RATE / config.RF_RATE_FILENAME, skiprows=6)
+    rf = pd.read_excel(config.PATH_RF_RATE / config.RF_RATE_FILENAME)
     rf = rf.rename(columns={"Date": "date", "RF": "rf"})
     rf["date"] = pd.to_datetime(rf["date"], format="%Y%m%d")
     rf = rf.set_index("date")
@@ -156,8 +156,9 @@ def create_top_liquid_dataset(
 ) -> None:
     topn = config.topn
     raw_data_filename = f"top{topn}_" + config.RAW_DATA_FILENAME
+    raw_presence_matrix_filename = config.PRESENCE_MATRIX_FILENAME
 
-    if raw_data_filename not in listdir(config.PATH_OUTPUT):
+    if raw_data_filename not in listdir(config.PATH_OUTPUT) or raw_presence_matrix_filename not in listdir(config.PATH_OUTPUT):
         _create_top_liquid_returns(config, topn, store_mapping=store_mapping)
 
     crsp_returns = pd.read_csv(config.PATH_OUTPUT / raw_data_filename)
@@ -169,7 +170,7 @@ def create_top_liquid_dataset(
     crsp_returns = _add_hedging_assets(crsp_returns, config=config)
 
     crsp_returns.to_csv(
-        config.PATH_OUTPUT / (f"top{topn}_" + config.TRADE_DATASET_TMP_FILENAME)
+        config.PATH_OUTPUT / config.TRADE_DATASET_TMP_FILENAME
     )
 
 

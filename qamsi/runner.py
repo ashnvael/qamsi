@@ -23,15 +23,15 @@ from qamsi.backtest.plot import (
 )
 from qamsi.backtest.transaction_costs_charger import TransactionCostCharger
 from qamsi.base.returns import Returns
-from qamsi.dataset_builder_functions import DatasetData
+from qamsi.dataset_builder_functions import DatasetData, build_dataset
 
 
 class Runner:
     def __init__(
         self,
-        dataset_builder_fn: Callable[[BaseExperimentConfig], DatasetData],
         experiment_config: BaseExperimentConfig,
         trading_config: TradingConfig,
+        dataset_builder_fn: Callable[[BaseExperimentConfig], DatasetData] = build_dataset,
         ml_metrics: list[Callable] | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
@@ -56,7 +56,7 @@ class Runner:
         self._prepare()
 
     def _prepare(self) -> None:
-        dataset = self.dataset_builder_fn(self.experiment_config, verbose=self.verbose)
+        dataset = self.dataset_builder_fn(self.experiment_config)
         asset_universe = dataset.presence_matrix.columns.tolist()
 
         self.data = dataset.data.loc[: self.experiment_config.END_DATE]

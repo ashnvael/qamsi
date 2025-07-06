@@ -12,27 +12,27 @@ class BaseExperimentConfig:
 
     # Folders
     CRSP_PATH: Path = field(
-        default=Path(__file__).resolve().parents[2] / "data/crsp_raw",
+        default=Path(__file__).resolve().parents[2] / "data" / "crsp_raw",
         metadata={"docs": "Relative path to data folder"},
     )
 
     PATH_FACTORS: Path = field(
-        default=Path(__file__).resolve().parents[1] / "data" / "jkp_raw",
+        default=Path(__file__).resolve().parents[2] / "data" / "jkp_raw",
         metadata={"docs": "Relative path to data folder"},
     )
 
     PATH_RF_RATE: Path = field(
-        default=Path(__file__).resolve().parents[1] / "data" / "ff",
+        default=Path(__file__).resolve().parents[2] / "data" / "ff",
         metadata={"docs": "Relative path to data folder"},
     )
 
     PATH_MKT: Path = field(
-        default=Path(__file__).resolve().parents[1] / "data" / "gw_replication",
+        default=Path(__file__).resolve().parents[2] / "data" / "gw_replication",
         metadata={"docs": "Relative path to data folder"},
     )
 
     PATH_HEDGING_ASSETS: Path = field(
-        default=Path(__file__).resolve().parents[1] / "data" / "hedge",
+        default=Path(__file__).resolve().parents[2] / "data" / "hedge",
         metadata={"docs": "Relative path to data folder"},
     )
 

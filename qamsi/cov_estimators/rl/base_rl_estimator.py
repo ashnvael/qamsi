@@ -20,12 +20,15 @@ class ShrinkageType(Enum):
 
 class BaseRLCovEstimator(BaseCovEstimator):
     def __init__(
-        self, shrinkage_type: str = "linear", window_size: int | None = None
+        self, shrinkage_type: str = "linear", window_size: int | None = None, refit: bool = True,
     ) -> None:
         super().__init__()
 
         self.shrinkage_type = ShrinkageType(shrinkage_type)
         self.window_size = window_size
+
+        self.refit = refit
+        self._trained = False
 
         self.feat_scaler = StandardScaler()
 
@@ -59,6 +62,9 @@ class BaseRLCovEstimator(BaseCovEstimator):
 
     def _fit(self, training_data: TrainingData) -> None:
         self._seen_training_data = training_data
+
+        if self._trained and not self.refit:
+            return
 
         feat = training_data.features
 

@@ -14,7 +14,7 @@ from qamsi.utils.corr import avg_corr
 
 
 def _load_data(config: BaseExperimentConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
-    data = read_csv(config.PATH_OUTPUT, config.DF_FILENAME)
+    data = read_csv(config.PATH_OUTPUT, config.TRADE_DATASET_TMP_FILENAME)
 
     if not data.index.is_unique:
         msg = "Returns have non-unique dates!"
@@ -178,7 +178,7 @@ def create_dnk_features_targets(
 
     dnk_features = read_csv(config.PATH_TMP, features_filename)
 
-    targets = pd.read_csv(f"targets_{config.topn}.csv")
+    targets = pd.read_csv(config.PATH_TARGETS / f"targets_{config.topn}.csv")
     targets["start_date"] = pd.to_datetime(targets["start_date"])
     targets["end_date"] = pd.to_datetime(targets["end_date"])
 
