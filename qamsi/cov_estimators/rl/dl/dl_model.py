@@ -20,8 +20,8 @@ class AvailableModels(Enum):
 @dataclass
 class ModelConfig:
     lr: float = 1e-3
-    hidden_size: int = 32 # Matching BasicRewardNet for AIRL / GAIL
-    n_layers: int = 2 # Matching BasicRewardNet for AIRL / GAIL
+    hidden_size: int = 32  # Matching BasicRewardNet for AIRL / GAIL
+    n_layers: int = 2  # Matching BasicRewardNet for AIRL / GAIL
     dropout: float = 0.0
 
     n_epochs: int = 10
@@ -29,7 +29,9 @@ class ModelConfig:
     n_unique_features: int | None = None
 
     optimizer: Type[torch.optim.Optimizer] = torch.optim.SGD
-    scheduler: Type[torch.optim.lr_scheduler._LRScheduler] = torch.optim.lr_scheduler.CosineAnnealingLR
+    scheduler: Type[torch.optim.lr_scheduler._LRScheduler] = (
+        torch.optim.lr_scheduler.CosineAnnealingLR
+    )
 
     weights_decay: float = 0.0
 
@@ -51,7 +53,13 @@ class ModelConfig:
 
 
 class DeepLearningModel:
-    def __init__(self, n_features: int, model_cls: Type[nn.Module] | str = "mlp", model_config: ModelConfig = ModelConfig(), verbose: bool = False):
+    def __init__(
+        self,
+        n_features: int,
+        model_cls: Type[nn.Module] | str = "mlp",
+        model_config: ModelConfig = ModelConfig(),
+        verbose: bool = False,
+    ):
         self.model_config = model_config
         self.model_config.n_features = n_features
 
@@ -67,8 +75,14 @@ class DeepLearningModel:
         self.device = model_config.device
         self.verbose = verbose
 
-        self.optimizer = model_config.optimizer(self.model.parameters(), lr=model_config.lr, weight_decay=model_config.weights_decay)
-        self.scheduler = model_config.scheduler(self.optimizer, T_max=model_config.n_epochs)
+        self.optimizer = model_config.optimizer(
+            self.model.parameters(),
+            lr=model_config.lr,
+            weight_decay=model_config.weights_decay,
+        )
+        self.scheduler = model_config.scheduler(
+            self.optimizer, T_max=model_config.n_epochs
+        )
         self.criterion = model_config.loss
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
@@ -79,8 +93,8 @@ class DeepLearningModel:
         train_loader = DataLoader(
             train_set,
             batch_size=self.model_config.batch_size,
-            shuffle=False, # time series training
-            pin_memory=False, # due to mps training
+            shuffle=False,  # time series training
+            pin_memory=False,  # due to mps training
             drop_last=False,
         )
 
@@ -113,7 +127,10 @@ class DeepLearningModel:
                 self.optimizer.step()
 
                 if self.model_config.clip_grad_norm is not None:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.model_config.clip_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(),
+                        max_norm=self.model_config.clip_grad_norm,
+                    )
 
                 train_loss += loss.item()
 

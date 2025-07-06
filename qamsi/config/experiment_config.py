@@ -11,6 +11,36 @@ class BaseExperimentConfig:
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
     # Folders
+    CRSP_PATH: Path = field(
+        default=Path(__file__).resolve().parents[2] / "data" / "../../data/crsp_raw",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
+    PATH_FACTORS: Path = field(
+        default=Path(__file__).resolve().parents[1] / "data" / "jkp_raw",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
+    PATH_RF_RATE: Path = field(
+        default=Path(__file__).resolve().parents[1] / "data" / "ff",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
+    PATH_MKT: Path = field(
+        default=Path(__file__).resolve().parents[1] / "data" / "gw_replication",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
+    PATH_HEDGING_ASSETS: Path = field(
+        default=Path(__file__).resolve().parents[1] / "data" / "hedge",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
+    PATH_TMP: Path = field(
+        default=Path(__file__).resolve().parents[2] / "data" / "tmp",
+        metadata={"docs": "Relative path to data folder"},
+    )
+
     PATH_OUTPUT: Path = field(
         default=Path(__file__).resolve().parents[2] / "data" / "output",
         metadata={"docs": "Relative path to data folder"},
@@ -22,8 +52,47 @@ class BaseExperimentConfig:
     )
 
     # Filename
+    CRSP_FULL_TMP_FILENAME: str = field(
+        default="crsp_full_tmp.csv",
+        metadata={"docs": "File with full CRSP stock returns data for reloading"},
+    )
+
+    TRADE_DATASET_TMP_FILENAME: str = field(
+        default="crsp_factors_mkt_tmp.csv",
+        metadata={"docs": "File with full CRSP stock returns data for reloading"},
+    )
+
+    CRSP_FILENAME: str = field(
+        default="crsp_80s.csv", metadata={"docs": "File with CRSP stock returns data"}
+    )
+
+    RAW_DATA_FILENAME: str = field(
+        default="raw_data.csv",
+        metadata={"docs": "Initial filtered data for temporary storing"},
+    )
+
+    FACTORS_FILENAME: str = field(
+        default="jkp_factors.csv", metadata={"docs": "Tradeable factors file"}
+    )
+
+    RF_RATE_FILENAME: str = field(
+        default="FFDaily.xlsx", metadata={"docs": "Rf rate file"}
+    )
+
+    MKT_FILENAME: str = field(
+        default="spx.xlsx", metadata={"docs": "Market index file"}
+    )
+
+    HEDGING_ASSETS_FILENAME: str = field(
+        default="spx_fut.xlsx", metadata={"docs": "Tradeable hedging assets file"}
+    )
+
     DF_FILENAME: str = field(
         default="data_df.csv", metadata={"docs": "Preprocessed data"}
+    )
+
+    DNK_FEATURES_TMP_FILENAME: str = field(
+        default="dnk_features_tmp.csv", metadata={"docs": "Temporary storage of pre-computed features"}
     )
 
     PRESENCE_MATRIX_FILENAME: str | None = field(
@@ -75,7 +144,13 @@ class BaseExperimentConfig:
 
     # Universe Setting
     FACTORS: tuple[str] = field(
-        default=("MOEX_INDEX",),
+        default=(
+            "low_risk",
+            "momentum",
+            "size",
+            "quality",
+            "value",
+        ),
         metadata={"docs": "Tradeable factors tuple"},
     )
 
@@ -86,7 +161,7 @@ class BaseExperimentConfig:
 
     HEDGING_ASSETS: tuple[str] = field(
         default=("spx_fut",),
-        metadata={"docs": "Tradeable assets tuple"},
+        metadata={"docs": "Tradeable hedging assets tuple"},
     )
 
     RF_NAME: str = field(

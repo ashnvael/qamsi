@@ -11,7 +11,7 @@ from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
 
 from config.liquid_experiment_config import ExperimentConfig as LiquidConfig
-from config.spx_experiment_config import ExperimentConfig as SPXConfig
+from config.us_experiment_config import ExperimentConfig as SPXConfig
 from config.topn_experiment_config import ExperimentConfig as TopNConfig
 
 
@@ -42,13 +42,13 @@ TRADING_CONFIG = TradingConfig(
 
 
 def initialize(
-        dataset: Dataset,
-        with_causal_window: bool = True,
-        start: str | None = None,
-        end: str | None = None,
-        trading_config: TradingConfig = TRADING_CONFIG,
-        rebal_freq: str = REBAL_FREQ,
-        topn: int | None = None,
+    dataset: Dataset,
+    with_causal_window: bool = True,
+    start: str | None = None,
+    end: str | None = None,
+    trading_config: TradingConfig = TRADING_CONFIG,
+    rebal_freq: str = REBAL_FREQ,
+    topn: int | None = None,
 ) -> tuple[Preprocessor, Runner]:
     experiment_config = dataset.value(topn=topn) if topn else dataset.value()
 

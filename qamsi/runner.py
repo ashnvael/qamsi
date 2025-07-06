@@ -54,8 +54,13 @@ class Runner:
         self._prepare()
 
     def _prepare(self) -> None:
-        data_df = read_csv(str(self.experiment_config.PATH_OUTPUT), self.experiment_config.DF_FILENAME)
-        presence_matrix = read_csv(str(self.experiment_config.PATH_OUTPUT), self.experiment_config.PRESENCE_MATRIX_FILENAME)
+        data_df = read_csv(
+            str(self.experiment_config.PATH_OUTPUT), self.experiment_config.DF_FILENAME
+        )
+        presence_matrix = read_csv(
+            str(self.experiment_config.PATH_OUTPUT),
+            self.experiment_config.PRESENCE_MATRIX_FILENAME,
+        )
         asset_universe = presence_matrix.columns.tolist()
 
         self.data = data_df.loc[: self.experiment_config.END_DATE]
@@ -68,36 +73,30 @@ class Runner:
 
         # TODO(@V): Handle by BacktestBuilder on top
         # TODO(@V): Separate files
-        prices_names = [
-            stock + "_Price" for stock in asset_universe
-        ]
+        prices_names = [stock + "_Price" for stock in asset_universe]
         if self.data.columns.isin(prices_names).any():
             self.prices = self.data.loc[:, prices_names]
             self.prices = self.prices.rename(
                 columns={col: col.rstrip("_Price") for col in self.prices.columns}
             )
         else:
-            self.prices = pd.DataFrame(
-                index=self.data.index, columns=asset_universe
-            )
+            self.prices = pd.DataFrame(index=self.data.index, columns=asset_universe)
 
-        market_cap_names = [
-            stock + "_Market_Cap" for stock in asset_universe
-        ]
+        market_cap_names = [stock + "_Market_Cap" for stock in asset_universe]
         if self.data.columns.isin(market_cap_names).any():
             self.mkt_caps = self.data.loc[:, market_cap_names]
             self.mkt_caps = self.mkt_caps.rename(
                 columns={col: col.rstrip("_Price") for col in self.mkt_caps.columns}
             )
         else:
-            self.mkt_caps = pd.DataFrame(
-                index=self.data.index, columns=asset_universe
-            )
+            self.mkt_caps = pd.DataFrame(index=self.data.index, columns=asset_universe)
 
         self.returns = Returns(self.data.loc[:, asset_universe])
         self.rf = self.data[self.experiment_config.RF_NAME]
 
-        self.targets = self.data[self.data.columns.intersection(set(self.experiment_config.TARGETS))]
+        self.targets = self.data[
+            self.data.columns.intersection(set(self.experiment_config.TARGETS))
+        ]
 
         # Factors are passed as excess returns
         self.factors = self.data.loc[:, self.experiment_config.FACTORS]

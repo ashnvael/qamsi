@@ -1,4 +1,4 @@
-#%%
+# %%
 from __future__ import annotations
 
 from typing import Callable
@@ -34,7 +34,8 @@ from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
 from qamsi.cov_estimators.cov_estimators import CovEstimators
 from run import Dataset, initialize
-#%%
+
+# %%
 REBAL_FREQ = "ME"
 DATASET = Dataset.TOPN_US
 TOP_N = 30
@@ -52,10 +53,14 @@ _, runner = initialize(
     topn=TOP_N,
     rebal_freq=REBAL_FREQ,
 )
-#%%
+
+
+# %%
 def vol_to_reward(volatility: float | pd.Series) -> float | pd.Series:
     return -volatility
-#%%
+
+
+# %%
 import gymnasium
 from gymnasium import spaces
 
@@ -180,7 +185,9 @@ class BanditEnvironment(gymnasium.Env):
 
     def render(self, mode: str = "human", close: bool = False):
         self.action_hist.plot()
-#%%
+
+
+# %%
 import gymnasium
 
 
@@ -276,7 +283,9 @@ class OptimalEnvironment(gymnasium.Env):
 
     def render(self, mode: str = "human", close: bool = False):
         self.action_hist.plot()
-#%%
+
+
+# %%
 class ExpertPolicy(NonTrainablePolicy):
     def __init__(self, env: gym.Env, optimal_policy: pd.Series) -> None:
         super().__init__(
@@ -377,7 +386,9 @@ def make_optimal_env(
         )
 
     return _init
-#%%
+
+
+# %%
 START_DATE = "1982-01-01"
 
 start_date = pd.Timestamp(START_DATE)
@@ -429,7 +440,7 @@ rollouts = rollout.rollout(
     rng=np.random.default_rng(12),
     verbose=True,
 )
-#%%
+# %%
 from IPython.display import clear_output
 
 # learner = RecurrentPPO("MlpLstmPolicy", env, verbose=1, device="mps")
@@ -451,7 +462,7 @@ trainer = GAIL(
 
 train_data = true_optimal.loc[true_optimal.index < train_end]
 trainer.train(len(train_data), callback=lambda x: clear_output())
-#%%
+# %%
 obs = env.reset()
 rewards = []
 optimal_values = []
@@ -495,47 +506,47 @@ for t in (pbar := tqdm(range(len(true_optimal) - 2_048))):
     #
     # if t % 20 == 0:
     #     env.action_hist.to_csv("cgp_ucb.csv", index=True, header=True)
-#%%
+# %%
 true_optimal["reward"]
-#%%
+# %%
 max_reward
-#%%
+# %%
 min_reward
-#%%
+# %%
 optim = pd.DataFrame(optimal_actions, columns=["date", "irl_gail"]).set_index("date")
 optim.to_csv(f"gail_irl_{TOP_N}.csv", index=True, header=True)
-#%%
+# %%
 # env.envs[0].action_hist.to_csv("irl_new.csv", index=True, header=True)
-#%%
+# %%
 # optim.to_csv("irl.csv", index=True, header=True)
-#%%
+# %%
 optim
-#%%
+# %%
 # from qamsi.utils.data import read_csv
 #
 # optimal_df = read_csv(".", "irl.csv")
-#%%
+# %%
 optimal = optim.copy()
-#%%
+# %%
 optimal = optimal.iloc[:, 0]
 optimal
-#%%
+# %%
 optimal_ = optimal.apply(lambda x: x.strip("[]"))
 optimal_
-#%%
+# %%
 optimal_ = optimal_.astype(float)
-#%%
+# %%
 optimal_.plot()
-#%%
+# %%
 true_optimal["shrinkage"].plot()
-#%%
+# %%
 p = optimal_.to_frame("irl").merge(
     true_optimal["shrinkage"], how="inner", left_index=True, right_index=True
 )
-p.plot(figsize=(12, 4));
-#%%
+p.plot(figsize=(12, 4))
+# %%
 optimal_.max()
-#%%
+# %%
 optimal_.min()
-#%%
+# %%
 optimal_.to_frame("irl").to_csv("irl_.csv")

@@ -144,9 +144,13 @@ def _QIS(Y, shrinkage: float = 1.0, k: int | None = None) -> pd.DataFrame:
     deltaQIS[-1] = np.maximum(deltaQIS[-1], crossing_point)
     for i in range(0, len(deltaQIS) - 1)[::-1]:
         if init_delta[i] < lambda1[i]:
-            deltaQIS[i] = np.maximum(np.minimum(deltaQIS[i], deltaQIS[i + 1]), crossing_point)
+            deltaQIS[i] = np.maximum(
+                np.minimum(deltaQIS[i], deltaQIS[i + 1]), crossing_point
+            )
         else:
-            deltaQIS[i] = np.minimum(np.minimum(deltaQIS[i], deltaQIS[i + 1]), crossing_point)
+            deltaQIS[i] = np.minimum(
+                np.minimum(deltaQIS[i], deltaQIS[i + 1]), crossing_point
+            )
 
     temp1 = dfu.to_numpy()
     temp2 = np.diag(deltaQIS)

@@ -86,8 +86,14 @@ class BaseRLCovEstimator(BaseCovEstimator):
         first_target_date = target.dropna(axis=0, how="any").first_valid_index()
         last_target_date = target.dropna(axis=0, how="any").last_valid_index()
 
-        first_date = first_feat_date if first_feat_date >= first_target_date else first_target_date
-        last_date = last_feat_date if last_target_date >= last_feat_date else last_target_date
+        first_date = (
+            first_feat_date
+            if first_feat_date >= first_target_date
+            else first_target_date
+        )
+        last_date = (
+            last_feat_date if last_target_date >= last_feat_date else last_target_date
+        )
 
         feat = feat.loc[first_date:last_date]
         if not last_pred.empty:

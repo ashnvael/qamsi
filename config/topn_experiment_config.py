@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from config.spx_experiment_config import ExperimentConfig as SPXExperimentConfig
+from config.us_experiment_config import ExperimentConfig as USExperimentConfig
 
 
 @dataclass
-class ExperimentConfig(SPXExperimentConfig):
+class TopNExperimentConfig(USExperimentConfig):
     def __init__(self, topn: int = 20):
         self.topn = topn
 
