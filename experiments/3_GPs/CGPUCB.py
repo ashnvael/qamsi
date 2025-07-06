@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.linear_model import BayesianRidge
 from sklearn.preprocessing import StandardScaler
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, DotProduct
+from sklearn.gaussian_process.kernels import RBF
 from scipy.optimize import fmin_l_bfgs_b, minimize
 
 from qamsi.config.trading_config import TradingConfig

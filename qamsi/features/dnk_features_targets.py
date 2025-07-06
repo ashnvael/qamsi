@@ -5,11 +5,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.covariance import LedoitWolf
+from tqdm import tqdm
 
 from qamsi.config.experiment_config import BaseExperimentConfig
+from qamsi.config.topn_experiment_config import TopNExperimentConfig
 from qamsi.utils.data import read_csv
 from qamsi.utils.corr import avg_corr
-from config.topn_experiment_config import TopNExperimentConfig
 
 
 def _load_data(config: BaseExperimentConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -24,15 +25,20 @@ def _load_data(config: BaseExperimentConfig) -> tuple[pd.DataFrame, pd.DataFrame
 
     return ret, presence_matrix
 
+
 def _rolling_feature(
-    df: pd.DataFrame, feature_fn: Callable, presense_matrix: pd.DataFrame, feature_name: str | None = None
+    df: pd.DataFrame,
+    feature_fn: Callable,
+    presense_matrix: pd.DataFrame,
+    feature_name: str | None = None,
+    verbose: bool = False,
 ):
     """Function to compute rolling correlation."""
     # Initialize a list to store results
     results = []
 
     # Perform calculation for each rolling window
-    for end in df.index:
+    for end in tqdm(df.index) if verbose else df.index:
         start = end - pd.DateOffset(months=1)
 
         curr_matrix = presense_matrix.loc[:end].iloc[-1]
@@ -52,20 +58,35 @@ def _rolling_feature(
     return rolling_feat
 
 
-def _compute_dnk_features(ret: pd.DataFrame, presence_matrix: pd.DataFrame, filename: Path) -> pd.DataFrame:
+def _compute_dnk_features(
+    ret: pd.DataFrame,
+    presence_matrix: pd.DataFrame,
+    filename: Path,
+    verbose: bool = False,
+) -> pd.DataFrame:
     # 1. Avg Corr.
     # Calculate rolling average correlation of non-diagonal elements
-    rolling_avg_corr = _rolling_feature(ret, avg_corr, presence_matrix, "avg_corr")
+    rolling_avg_corr = _rolling_feature(
+        ret, avg_corr, presence_matrix, "avg_corr", verbose=verbose
+    )
 
     # 2. Average volatility.
-    avg_vol = _rolling_feature(ret, lambda s: s.std(axis=0).mean(), presence_matrix, "avg_vol")
+    avg_vol = _rolling_feature(
+        ret, lambda s: s.std(axis=0).mean(), presence_matrix, "avg_vol", verbose=verbose
+    )
 
     # 3. EW Portfolio.
-    ew = _rolling_feature(ret, lambda s: np.prod(1 + np.nanmean(s, axis=1)) - 1, presence_matrix, "ew")
+    ew = _rolling_feature(
+        ret,
+        lambda s: np.prod(1 + np.nanmean(s, axis=1)) - 1,
+        presence_matrix,
+        "ew",
+        verbose=verbose,
+    )
 
     # 4. EW Portfolio Moving Average.
     ewma = []
-    for end in ew.index:
+    for end in tqdm(ew.index) if verbose else ew.index:
         start = end - pd.DateOffset(months=1)
 
         if end > ew.index[-1]:
@@ -87,7 +108,13 @@ def _compute_dnk_features(ret: pd.DataFrame, presence_matrix: pd.DataFrame, file
         lw.fit(s)
         return lw.shrinkage_
 
-    lw = _rolling_feature(ret, lambda s: get_intensity(s), presence_matrix, "lw_shrinkage")
+    lw = _rolling_feature(
+        ret,
+        lambda s: get_intensity(s),
+        presence_matrix,
+        "lw_shrinkage",
+        verbose=verbose,
+    )
 
     # 5. Momentum
     momentum = _rolling_feature(
@@ -95,10 +122,17 @@ def _compute_dnk_features(ret: pd.DataFrame, presence_matrix: pd.DataFrame, file
         lambda s: np.nanmean(np.where(s, s > 0, 1), axis=0).mean(),
         presence_matrix,
         "momentum_feature",
+        verbose=verbose,
     )
 
     # 6. Trace.
-    trace = _rolling_feature(ret, lambda s: np.trace(s.fillna(0).cov()), presence_matrix, "trace")
+    trace = _rolling_feature(
+        ret,
+        lambda s: np.trace(s.fillna(0).cov()),
+        presence_matrix,
+        "trace",
+        verbose=verbose,
+    )
 
     # 7. Universe Volatility.
     ew_vol = ew.rolling(window=252, min_periods=1).std().fillna(0)
@@ -124,16 +158,23 @@ def _compute_dnk_features(ret: pd.DataFrame, presence_matrix: pd.DataFrame, file
         raise ValueError(msg)
 
     features.to_csv(filename)
-    
+
     return features
 
 
-def create_dnk_features_targets(config: TopNExperimentConfig) -> None:
+def create_dnk_features_targets(
+    config: TopNExperimentConfig, verbose: bool = False
+) -> None:
     ret, presence_matrix = _load_data(config)
 
     features_filename = config.DNK_FEATURES_TMP_FILENAME + f"_{config.topn}.csv"
     if features_filename not in listdir(config.PATH_TMP):
-        _compute_dnk_features(ret, presence_matrix, filename=config.PATH_TMP / features_filename)
+        _compute_dnk_features(
+            ret,
+            presence_matrix,
+            filename=config.PATH_TMP / features_filename,
+            verbose=verbose,
+        )
 
     dnk_features = read_csv(config.PATH_TMP, features_filename)
 

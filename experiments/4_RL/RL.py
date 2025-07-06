@@ -7,8 +7,7 @@ import pandas as pd
 import gym
 from gym import spaces
 
-from sb3_contrib import RecurrentPPO
-from stable_baselines3 import SAC, PPO
+from stable_baselines3 import SAC
 
 from qamsi.config.trading_config import TradingConfig
 from qamsi.runner import Runner

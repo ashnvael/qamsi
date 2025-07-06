@@ -10,13 +10,11 @@ from qamsi.strategies.estimated.min_var import MinVariance
 from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
 
-from config.liquid_experiment_config import ExperimentConfig as LiquidConfig
-from config.us_experiment_config import ExperimentConfig as SPXConfig
-from config.topn_experiment_config import ExperimentConfig as TopNConfig
+from qamsi.config.us_experiment_config import ExperimentConfig as SPXConfig
+from qamsi.config.topn_experiment_config import TopNExperimentConfig as TopNConfig
 
 
 class Dataset(Enum):
-    LIQUID_US = LiquidConfig
     SPX_US = SPXConfig
     TOPN_US = TopNConfig
 

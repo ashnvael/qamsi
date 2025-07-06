@@ -15,19 +15,14 @@ from IPython.display import clear_output
 import gym
 from gym import spaces
 
-from sb3_contrib import RecurrentPPO
-from stable_baselines3 import SAC, PPO
+from stable_baselines3 import SAC
 
 from imitation.policies.base import NonTrainablePolicy
 from imitation.algorithms.adversarial.gail import GAIL
-from imitation.algorithms.adversarial.airl import AIRL
 from imitation.data import rollout
 from imitation.data.wrappers import RolloutInfoWrapper
-from imitation.policies.serialize import load_policy
-from imitation.data.types import TransitionsMinimal
-from imitation.rewards.reward_nets import BasicRewardNet, BasicShapedRewardNet
+from imitation.rewards.reward_nets import BasicShapedRewardNet
 from imitation.util.networks import RunningNorm
-from imitation.util.util import make_vec_env
 
 from qamsi.config.trading_config import TradingConfig
 from qamsi.runner import Runner
@@ -441,7 +436,6 @@ rollouts = rollout.rollout(
     verbose=True,
 )
 # %%
-from IPython.display import clear_output
 
 # learner = RecurrentPPO("MlpLstmPolicy", env, verbose=1, device="mps")
 learner = SAC("MlpPolicy", env, verbose=0, device="mps")

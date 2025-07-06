@@ -178,7 +178,7 @@ class CGPUCB(object):
         :param density: Whether to plot density, boolean.
         :return:
         """
-        if fixed_dimension is 0:
+        if fixed_dimension == 0:
             fixed_dim_name = "action"
             xlabel = "context"
         else:

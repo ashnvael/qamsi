@@ -159,7 +159,6 @@ class ShrinkageGP:
 
 
 import gc
-from tqdm import tqdm
 
 available_dates = runner.returns.simple_returns.loc["1982-01-01":].index
 

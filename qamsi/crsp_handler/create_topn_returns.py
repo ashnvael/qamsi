@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from qamsi.config.experiment_config import BaseExperimentConfig
+from qamsi.config.topn_experiment_config import TopNExperimentConfig
 
 
 CRSP_MAPPING_FILENAME = "crsp_mapping.csv"
@@ -151,7 +152,7 @@ def _add_hedging_assets(
 
 
 def create_top_liquid_dataset(
-    config: BaseExperimentConfig, store_mapping: bool = False
+    config: TopNExperimentConfig, store_mapping: bool = False
 ) -> None:
     topn = config.topn
     raw_data_filename = f"top{topn}_" + config.RAW_DATA_FILENAME

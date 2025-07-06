@@ -12,7 +12,7 @@ class BaseExperimentConfig:
 
     # Folders
     CRSP_PATH: Path = field(
-        default=Path(__file__).resolve().parents[2] / "data" / "../../data/crsp_raw",
+        default=Path(__file__).resolve().parents[2] / "data/crsp_raw",
         metadata={"docs": "Relative path to data folder"},
     )
 
@@ -92,7 +92,8 @@ class BaseExperimentConfig:
     )
 
     DNK_FEATURES_TMP_FILENAME: str = field(
-        default="dnk_features_tmp.csv", metadata={"docs": "Temporary storage of pre-computed features"}
+        default="dnk_features_tmp.csv",
+        metadata={"docs": "Temporary storage of pre-computed features"},
     )
 
     PRESENCE_MATRIX_FILENAME: str | None = field(

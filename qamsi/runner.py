@@ -23,17 +23,19 @@ from qamsi.backtest.plot import (
 )
 from qamsi.backtest.transaction_costs_charger import TransactionCostCharger
 from qamsi.base.returns import Returns
-from qamsi.utils.data import read_csv
+from qamsi.dataset_builder_functions import DatasetData
 
 
 class Runner:
     def __init__(
         self,
+        dataset_builder_fn: Callable[[BaseExperimentConfig], DatasetData],
         experiment_config: BaseExperimentConfig,
         trading_config: TradingConfig,
         ml_metrics: list[Callable] | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
+        self.dataset_builder_fn = dataset_builder_fn
         self.experiment_config = experiment_config
         self.trading_config = trading_config
 
@@ -54,18 +56,14 @@ class Runner:
         self._prepare()
 
     def _prepare(self) -> None:
-        data_df = read_csv(
-            str(self.experiment_config.PATH_OUTPUT), self.experiment_config.DF_FILENAME
-        )
-        presence_matrix = read_csv(
-            str(self.experiment_config.PATH_OUTPUT),
-            self.experiment_config.PRESENCE_MATRIX_FILENAME,
-        )
-        asset_universe = presence_matrix.columns.tolist()
+        dataset = self.dataset_builder_fn(self.experiment_config, verbose=self.verbose)
+        asset_universe = dataset.presence_matrix.columns.tolist()
 
-        self.data = data_df.loc[: self.experiment_config.END_DATE]
+        self.data = dataset.data.loc[: self.experiment_config.END_DATE]
         self.data.columns = self.data.columns.astype(str)
-        self.presence_matrix = presence_matrix.loc[: self.experiment_config.END_DATE]
+        self.presence_matrix = dataset.presence_matrix.loc[
+            : self.experiment_config.END_DATE
+        ]
 
         if len(self.data) == 0:
             msg = "Backtesting data is empty!"
