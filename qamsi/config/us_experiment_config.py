@@ -7,7 +7,7 @@ from qamsi.config.experiment_config import BaseExperimentConfig
 
 
 @dataclass
-class ExperimentConfig(BaseExperimentConfig):
+class USExperimentConfig(BaseExperimentConfig):
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
     # Experiment Settings

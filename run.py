@@ -11,13 +11,15 @@ from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
 from qamsi.dataset_builder_functions import build_dnk_dataset
 
-from qamsi.config.us_experiment_config import ExperimentConfig as SPXConfig
+from qamsi.config.us_experiment_config import USExperimentConfig as SPXConfig
 from qamsi.config.topn_experiment_config import TopNExperimentConfig as TopNConfig
+from qamsi.config.jkp_experiment_config import JKPExperimentConfig as JKPConfig
 
 
 class Dataset(Enum):
     SPX_US = SPXConfig
     TOPN_US = TopNConfig
+    JKP = JKPConfig
 
 
 REBAL_FREQ = "ME"

@@ -24,7 +24,6 @@ class DatasetData:
 
 def build_dataset(
     config: BaseExperimentConfig,
-    prefix: str,
     universe_builder_fn: Callable[
         [
             pd.DataFrame,
@@ -39,23 +38,20 @@ def build_dataset(
             f"Output directory {config.PATH_OUTPUT} does not exist."
         )
 
-    if config.DF_FILENAME not in listdir(
-        config.PATH_OUTPUT
-    ) or config.PRESENCE_MATRIX_FILENAME not in listdir(config.PATH_OUTPUT):
+    df_filename = config.PREFIX + config.DF_FILENAME
+    pm_filename = config.PREFIX + config.PRESENCE_MATRIX_FILENAME
+    available_files = listdir(config.PATH_OUTPUT)
+
+    if df_filename not in available_files or pm_filename not in available_files:
         if verbose:
             print("Creating returns dataset...")
-        create_dataset(
-            config=config, prefix=prefix, universe_builder_fn=universe_builder_fn
-        )
+        create_dataset(config=config, universe_builder_fn=universe_builder_fn)
         if verbose:
             print("Calculating features and targets...")
         features_targets_fn(config, verbose)
 
-    data_df = read_csv(config.PATH_OUTPUT, config.DF_FILENAME)
-    presence_matrix = read_csv(
-        str(config.PATH_OUTPUT),
-        config.PRESENCE_MATRIX_FILENAME,
-    )
+    data_df = read_csv(config.PATH_OUTPUT, df_filename)
+    presence_matrix = read_csv(config.PATH_OUTPUT, pm_filename)
 
     return DatasetData(data=data_df, presence_matrix=presence_matrix)
 
@@ -63,13 +59,10 @@ def build_dataset(
 def build_dnk_dataset(
     config: TopNExperimentConfig, verbose: bool = False
 ) -> DatasetData:
-    topn = config.topn
-    prefix = f"top{topn}_"
     return build_dataset(
         config=config,
-        prefix=prefix,
         universe_builder_fn=lambda data: mkt_cap_topn_universe_builder_fn(
-            data, topn=topn
+            data, topn=config.TOPN
         ),
         features_targets_fn=create_dnk_features_targets,
         verbose=verbose,

@@ -14,13 +14,15 @@ from qamsi.utils.corr import avg_corr
 
 
 def _load_data(config: BaseExperimentConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
-    data = read_csv(config.PATH_OUTPUT, config.TRADE_DATASET_TMP_FILENAME)
+    filename = config.PREFIX + config.TRADE_DATASET_TMP_FILENAME
+    pm_filename = config.PREFIX + config.PRESENCE_MATRIX_FILENAME
+    data = read_csv(config.PATH_OUTPUT, filename)
 
     if not data.index.is_unique:
         msg = "Returns have non-unique dates!"
         raise ValueError(msg)
 
-    presence_matrix = read_csv(config.PATH_OUTPUT, config.PRESENCE_MATRIX_FILENAME)
+    presence_matrix = read_csv(config.PATH_OUTPUT, pm_filename)
 
     return data, presence_matrix
 
@@ -103,9 +105,9 @@ def _compute_dnk_features(
     # 4. Ledoit-Wolf Shrinkage Intensity.
     def get_intensity(s: pd.DataFrame):
         s = s.copy().fillna(0)
-        lw = LedoitWolf()
-        lw.fit(s)
-        return lw.shrinkage_
+        lw_estimator = LedoitWolf()
+        lw_estimator.fit(s)
+        return lw_estimator.shrinkage_
 
     lw = _rolling_feature(
         ret,
@@ -167,7 +169,7 @@ def create_dnk_features_targets(
     data, presence_matrix = _load_data(config)
     ret = data[presence_matrix.columns]
 
-    features_filename = f"top{config.topn}_" + config.DNK_FEATURES_TMP_FILENAME
+    features_filename = config.PREFIX + config.DNK_FEATURES_TMP_FILENAME
     if features_filename not in listdir(config.PATH_TMP):
         _compute_dnk_features(
             ret,
@@ -178,7 +180,7 @@ def create_dnk_features_targets(
 
     dnk_features = read_csv(config.PATH_TMP, features_filename)
 
-    targets = pd.read_csv(config.PATH_TARGETS / f"targets_{config.topn}.csv")
+    targets = pd.read_csv(config.PATH_TARGETS / f"targets_{config.TOPN}.csv")
     targets["start_date"] = pd.to_datetime(targets["start_date"])
     targets["end_date"] = pd.to_datetime(targets["end_date"])
 
@@ -192,14 +194,14 @@ def create_dnk_features_targets(
     dnk_data = dnk_data.rename(columns={"shrinkage": "target"})
 
     full_df = data.merge(dnk_data, left_index=True, right_index=True)
-    full_df.to_csv(config.PATH_OUTPUT / config.DF_FILENAME)
+    full_df.to_csv(config.PATH_OUTPUT / (config.PREFIX + config.DF_FILENAME))
 
 
 if __name__ == "__main__":
     from run import Dataset
 
-    topn = 30
+    TOP_N = 30
     dataset = Dataset.TOPN_US
 
-    config = dataset.value(topn=topn)
-    create_dnk_features_targets(config)
+    settings = dataset.value(topn=TOP_N)
+    create_dnk_features_targets(settings)

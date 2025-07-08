@@ -8,6 +8,11 @@ import pandas as pd
 
 @dataclass
 class BaseExperimentConfig:
+    PREFIX: str = field(
+        default="crsp",
+        metadata={"docs": "Prefix for all output files to define dataset"},
+    )
+
     RANDOM_SEED: int = field(default=12, metadata={"docs": "Fix random seed"})
 
     # Folders

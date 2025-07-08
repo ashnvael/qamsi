@@ -67,7 +67,6 @@ def _create_presence_matrix(
 
 def _create_returns(
     config: BaseExperimentConfig,
-    prefix: str,
     universe_builder_fn: Callable[
         [
             pd.DataFrame,
@@ -94,8 +93,12 @@ def _create_returns(
         .pivot_table(index="date", columns="permno", values="ret")
     )
 
-    pivoted_returns.to_csv(config.PATH_OUTPUT / (prefix + config.RAW_DATA_FILENAME))
-    presence_matrix.to_csv(config.PATH_OUTPUT / config.PRESENCE_MATRIX_FILENAME)
+    pivoted_returns.to_csv(
+        config.PATH_OUTPUT / (config.PREFIX + config.RAW_DATA_FILENAME)
+    )
+    presence_matrix.to_csv(
+        config.PATH_OUTPUT / (config.PREFIX + config.PRESENCE_MATRIX_FILENAME)
+    )
 
 
 def _add_factors(
@@ -154,7 +157,6 @@ def _add_hedging_assets(
 
 def create_dataset(
     config: BaseExperimentConfig,
-    prefix: str,
     universe_builder_fn: Callable[
         [
             pd.DataFrame,
@@ -163,15 +165,14 @@ def create_dataset(
     ],
     store_mapping: bool = False,
 ) -> None:
-    raw_data_filename = prefix + config.RAW_DATA_FILENAME
-    raw_presence_matrix_filename = config.PRESENCE_MATRIX_FILENAME
+    raw_data_filename = config.PREFIX + config.RAW_DATA_FILENAME
+    raw_presence_matrix_filename = config.PREFIX + config.PRESENCE_MATRIX_FILENAME
 
     if raw_data_filename not in listdir(
         config.PATH_OUTPUT
     ) or raw_presence_matrix_filename not in listdir(config.PATH_OUTPUT):
         _create_returns(
             config=config,
-            prefix=prefix,
             universe_builder_fn=universe_builder_fn,
             store_mapping=store_mapping,
         )
@@ -184,7 +185,9 @@ def create_dataset(
     crsp_returns = _add_rf_rate_and_market_index(crsp_returns, config=config)
     crsp_returns = _add_hedging_assets(crsp_returns, config=config)
 
-    crsp_returns.to_csv(config.PATH_OUTPUT / config.TRADE_DATASET_TMP_FILENAME)
+    crsp_returns.to_csv(
+        config.PATH_OUTPUT / (config.PREFIX + config.TRADE_DATASET_TMP_FILENAME)
+    )
 
 
 if __name__ == "__main__":
@@ -199,7 +202,6 @@ if __name__ == "__main__":
     settings = dataset.value(topn=TOP_N)
     create_dataset(
         config=settings,
-        prefix=f"top{TOP_N}_",
         universe_builder_fn=lambda cfg: mkt_cap_topn_universe_builder_fn(
             cfg, topn=TOP_N
         ),
