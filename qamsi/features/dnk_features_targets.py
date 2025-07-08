@@ -21,9 +21,8 @@ def _load_data(config: BaseExperimentConfig) -> tuple[pd.DataFrame, pd.DataFrame
         raise ValueError(msg)
 
     presence_matrix = read_csv(config.PATH_OUTPUT, config.PRESENCE_MATRIX_FILENAME)
-    ret = data[presence_matrix.columns]
 
-    return ret, presence_matrix
+    return data, presence_matrix
 
 
 def _rolling_feature(
@@ -165,9 +164,10 @@ def _compute_dnk_features(
 def create_dnk_features_targets(
     config: TopNExperimentConfig, verbose: bool = False
 ) -> None:
-    ret, presence_matrix = _load_data(config)
+    data, presence_matrix = _load_data(config)
+    ret = data[presence_matrix.columns]
 
-    features_filename = config.DNK_FEATURES_TMP_FILENAME + f"_{config.topn}.csv"
+    features_filename = f"top{config.topn}_" + config.DNK_FEATURES_TMP_FILENAME
     if features_filename not in listdir(config.PATH_TMP):
         _compute_dnk_features(
             ret,
@@ -190,11 +190,8 @@ def create_dnk_features_targets(
     dnk_data = dnk_data.set_index("date")
 
     dnk_data = dnk_data.rename(columns={"shrinkage": "target"})
-    dnk_data = dnk_data.merge(
-        dnk_features, how="inner", left_index=True, right_index=True
-    )
 
-    full_df = ret.merge(dnk_data, left_index=True, right_index=True)
+    full_df = data.merge(dnk_data, left_index=True, right_index=True)
     full_df.to_csv(config.PATH_OUTPUT / config.DF_FILENAME)
 
 

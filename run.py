@@ -9,6 +9,7 @@ from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
 from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
+from qamsi.dataset_builder_functions import build_topn_dataset
 
 from qamsi.config.us_experiment_config import ExperimentConfig as SPXConfig
 from qamsi.config.topn_experiment_config import TopNExperimentConfig as TopNConfig
@@ -70,6 +71,7 @@ def initialize(
     preprocessor = Preprocessor()
 
     runner = Runner(
+        dataset_builder_fn=lambda config: build_topn_dataset(config, verbose=True),
         experiment_config=experiment_config,
         trading_config=trading_config,
         verbose=True,
@@ -79,9 +81,6 @@ def initialize(
 
 
 def run_backtest() -> StrategyStatistics:
-    print("Running backtest...")
-    print(f"Estimation window: {ESTIMATION_WINDOW}")
-
     preprocessor, runner = initialize(
         dataset=DATASET,
         with_causal_window=True,
@@ -96,6 +95,9 @@ def run_backtest() -> StrategyStatistics:
         trading_config=trading_config,
         window_size=ESTIMATION_WINDOW,
     )
+
+    print("Running backtest...")
+    print(f"Estimation window: {ESTIMATION_WINDOW}")
 
     result = runner(
         feature_processor=preprocessor,

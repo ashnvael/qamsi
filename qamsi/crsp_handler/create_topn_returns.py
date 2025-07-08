@@ -7,6 +7,7 @@ import pandas as pd
 
 from qamsi.config.experiment_config import BaseExperimentConfig
 from qamsi.config.topn_experiment_config import TopNExperimentConfig
+from qamsi.utils.data import read_csv
 
 
 CRSP_MAPPING_FILENAME = "crsp_mapping.csv"
@@ -146,7 +147,7 @@ def _add_hedging_assets(
     spx_fut = spx_fut[["price"]]
     spx_fut["spx_fut"] = spx_fut["price"].pct_change()
 
-    return crsp_returns.merge(spx_fut, left_index=True, right_index=True, how="left")
+    return crsp_returns.merge(spx_fut["spx_fut"], left_index=True, right_index=True, how="left")
 
 
 def create_top_liquid_dataset(
@@ -161,7 +162,7 @@ def create_top_liquid_dataset(
     ) or raw_presence_matrix_filename not in listdir(config.PATH_OUTPUT):
         _create_top_liquid_returns(config, topn, store_mapping=store_mapping)
 
-    crsp_returns = pd.read_csv(config.PATH_OUTPUT / raw_data_filename)
+    crsp_returns = read_csv(config.PATH_OUTPUT, raw_data_filename)
 
     crsp_returns = _add_factors(
         crsp_returns, config=config, selected_factors=list(config.FACTORS)
