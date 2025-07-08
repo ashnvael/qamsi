@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import TimeSeriesSplit
 
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
