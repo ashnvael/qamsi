@@ -20,7 +20,10 @@ class ShrinkageType(Enum):
 
 class BaseRLCovEstimator(BaseCovEstimator):
     def __init__(
-        self, shrinkage_type: str = "linear", window_size: int | None = None, refit: bool = True,
+        self,
+        shrinkage_type: str = "linear",
+        window_size: int | None = None,
+        refit: bool = True,
     ) -> None:
         super().__init__()
 

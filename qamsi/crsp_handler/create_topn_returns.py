@@ -94,9 +94,7 @@ def _create_top_liquid_returns(
     pivoted_returns.to_csv(
         config.PATH_OUTPUT / (f"top{topn}_" + config.RAW_DATA_FILENAME)
     )
-    presence_matrix.to_csv(
-        config.PATH_OUTPUT / config.PRESENCE_MATRIX_FILENAME
-    )
+    presence_matrix.to_csv(config.PATH_OUTPUT / config.PRESENCE_MATRIX_FILENAME)
 
 
 def _add_factors(
@@ -158,7 +156,9 @@ def create_top_liquid_dataset(
     raw_data_filename = f"top{topn}_" + config.RAW_DATA_FILENAME
     raw_presence_matrix_filename = config.PRESENCE_MATRIX_FILENAME
 
-    if raw_data_filename not in listdir(config.PATH_OUTPUT) or raw_presence_matrix_filename not in listdir(config.PATH_OUTPUT):
+    if raw_data_filename not in listdir(
+        config.PATH_OUTPUT
+    ) or raw_presence_matrix_filename not in listdir(config.PATH_OUTPUT):
         _create_top_liquid_returns(config, topn, store_mapping=store_mapping)
 
     crsp_returns = pd.read_csv(config.PATH_OUTPUT / raw_data_filename)
@@ -169,9 +169,7 @@ def create_top_liquid_dataset(
     crsp_returns = _add_rf_rate_and_market_index(crsp_returns, config=config)
     crsp_returns = _add_hedging_assets(crsp_returns, config=config)
 
-    crsp_returns.to_csv(
-        config.PATH_OUTPUT / config.TRADE_DATASET_TMP_FILENAME
-    )
+    crsp_returns.to_csv(config.PATH_OUTPUT / config.TRADE_DATASET_TMP_FILENAME)
 
 
 if __name__ == "__main__":

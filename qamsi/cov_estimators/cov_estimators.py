@@ -2,7 +2,9 @@ from enum import Enum
 
 from qamsi.cov_estimators.heuristic.hist_cov_estimator import HistoricalCovEstimator
 from qamsi.cov_estimators.factor.factor_cov_estimator import FactorCovEstimator
-from qamsi.cov_estimators.rl.behavioral_cloning.last_optimal_estimator import LastOptimalCovEstimator
+from qamsi.cov_estimators.rl.behavioral_cloning.last_optimal_estimator import (
+    LastOptimalCovEstimator,
+)
 
 from qamsi.cov_estimators.shrinkage.diag_hist_cov_estimator import (
     DiagHistoricalCovEstimator,
@@ -19,10 +21,16 @@ from qamsi.cov_estimators.rl.behavioral_cloning.ma_estimator import MACovEstimat
 from qamsi.cov_estimators.rl.behavioral_cloning.dnk_estimator import DNKCovEstimator
 from qamsi.cov_estimators.rl.behavioral_cloning.ols_estimator import OLSCovEstimator
 from qamsi.cov_estimators.rl.behavioral_cloning.gpr_estimator import GPRCovEstimator
-from qamsi.cov_estimators.rl.behavioral_cloning.pretrained_estimator import PretrainedCovEstimator
-from qamsi.cov_estimators.rl.behavioral_cloning.uncert_ensemble_estimator import UncertEnsembleCovEstimator
+from qamsi.cov_estimators.rl.behavioral_cloning.pretrained_estimator import (
+    PretrainedCovEstimator,
+)
+from qamsi.cov_estimators.rl.behavioral_cloning.uncert_ensemble_estimator import (
+    UncertEnsembleCovEstimator,
+)
 
-from qamsi.cov_estimators.rl.behavioral_cloning.rf_estimator import RandomForestCovEstimator
+from qamsi.cov_estimators.rl.behavioral_cloning.rf_estimator import (
+    RandomForestCovEstimator,
+)
 from qamsi.cov_estimators.rl.behavioral_cloning.xgb_estimator import XGBCovEstimator
 from qamsi.cov_estimators.rl.behavioral_cloning.dl_estimator import DLCovEstimator
 

@@ -12,7 +12,11 @@ class TopNExperimentConfig(USExperimentConfig):
         self.topn = topn
 
         self.DF_FILENAME = f"top{self.topn}_" + self.DF_FILENAME
-        self.PRESENCE_MATRIX_FILENAME = f"top{self.topn}_" + self.PRESENCE_MATRIX_FILENAME
-        self.TRADE_DATASET_TMP_FILENAME = f"top{self.topn}_" + self.TRADE_DATASET_TMP_FILENAME
+        self.PRESENCE_MATRIX_FILENAME = (
+            f"top{self.topn}_" + self.PRESENCE_MATRIX_FILENAME
+        )
+        self.TRADE_DATASET_TMP_FILENAME = (
+            f"top{self.topn}_" + self.TRADE_DATASET_TMP_FILENAME
+        )
 
         self.PATH_TARGETS = Path(__file__).resolve().parents[2] / "data" / "targets"

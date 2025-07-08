@@ -10,7 +10,7 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.vec_env import DummyVecEnv
 from imitation.algorithms.base import DemonstrationAlgorithm
 from imitation.policies.base import NonTrainablePolicy
-from imitation.rewards.reward_nets import BasicRewardNet
+from imitation.rewards.reward_nets import BasicShapedRewardNet
 from imitation.util.networks import RunningNorm
 from imitation.policies import serialize
 from imitation.data import rollout, types
@@ -53,41 +53,19 @@ class IRLCovEstimator(BaseRLCovEstimator):
         self.use_saved_policy = use_saved_policy
         self.random_seed = random_seed
 
-        self.env = ...
-
         self.imitation_trainer_cls = imitation_trainer_cls
-        self.policy = policy_builder(self.env)
+        self.policy_builder = policy_builder
 
-        self.reward_net = BasicRewardNet(
-            observation_space=self.env.observation_space,
-            action_space=self.env.action_space,
-            normalize_input_layer=RunningNorm,
-        )
+    def collect_rollouts(
+        self, env: DummyVecEnv, optimal_env: DummyVecEnv, optimal_actions: pd.Series
+    ) -> Sequence[types.TrajectoryWithRew]:
+        expert = ExpertPolicy(env, optimal_actions)
 
-    def collect_rollouts(self) -> Sequence[types.TrajectoryWithRew]:
-        # Number of environments to vectorize (e.g., 4 parallel environments)
-        n_envs = 1
-
-        # Create the vectorized environment using DummyVecEnv
-        env = DummyVecEnv(
-            [
-                make_env(runner, start_date, train_end, min_reward, max_reward)
-                for _ in range(n_envs)
-            ]
-        )
-        optimal_env = DummyVecEnv(
-            [
-                make_optimal_env(runner, true_optimal, start_date, train_end)
-                for _ in range(n_envs)
-            ]
-        )
-
-        expert = ExpertPolicy(env, true_optimal["shrinkage"])
         return rollout.rollout(
             expert,
             optimal_env,
             rollout.make_sample_until(
-                min_timesteps=len(true_optimal.loc[true_optimal.index < train_end]),
+                min_timesteps=len(optimal_actions),
                 min_episodes=None,
             ),
             rng=np.random.default_rng(self.random_seed),
@@ -98,8 +76,35 @@ class IRLCovEstimator(BaseRLCovEstimator):
         self, features: pd.DataFrame, shrinkage_target: pd.Series
     ) -> None:
         if ...:
-            self.policy = serialize.load_stable_baselines_model(self.policy.__class__, path=str(self.save_path), venv=self.env)
+            self.policy = serialize.load_stable_baselines_model(
+                self.policy.__class__, path=str(self.save_path), venv=self.env
+            )
         else:
+            n_envs = 1
+
+            rewards = ...
+
+            env = DummyVecEnv([make_env(self.shrinkage) for _ in range(n_envs)])
+            optimal_env = DummyVecEnv(
+                [
+                    make_optimal_env(runner, true_optimal, start_date, train_end)
+                    for _ in range(n_envs)
+                ]
+            )
+
+            self.policy = self.policy_builder(env)
+
+            self.reward_net = BasicShapedRewardNet(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                normalize_input_layer=RunningNorm,
+            )
+
+            rollouts = self.collect_rollouts(
+                env=env,
+                optimal_env=optimal_env,
+                optimal_actions=shrinkage_target,
+            )
             self.trainer = self.imitation_trainer_cls(
                 demonstrations=rollouts,
                 demo_batch_size=1024,

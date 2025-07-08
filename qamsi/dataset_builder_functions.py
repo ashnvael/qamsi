@@ -38,7 +38,9 @@ def build_topn_dataset(config: TopNExperimentConfig, verbose: bool = False) -> D
             f"Output directory {config.PATH_OUTPUT} does not exist."
         )
 
-    if config.DF_FILENAME not in listdir(config.PATH_OUTPUT) or config.PRESENCE_MATRIX_FILENAME not in listdir(config.PATH_OUTPUT):
+    if config.DF_FILENAME not in listdir(
+        config.PATH_OUTPUT
+    ) or config.PRESENCE_MATRIX_FILENAME not in listdir(config.PATH_OUTPUT):
         if verbose:
             print("Creating returns dataset...")
         create_top_liquid_dataset(config)

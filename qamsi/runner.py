@@ -31,7 +31,9 @@ class Runner:
         self,
         experiment_config: BaseExperimentConfig,
         trading_config: TradingConfig,
-        dataset_builder_fn: Callable[[BaseExperimentConfig], DatasetData] = build_dataset,
+        dataset_builder_fn: Callable[
+            [BaseExperimentConfig], DatasetData
+        ] = build_dataset,
         ml_metrics: list[Callable] | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
