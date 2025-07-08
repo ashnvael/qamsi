@@ -188,11 +188,19 @@ def create_dataset(
 
 
 if __name__ == "__main__":
-    from qamsi.crsp_handler.universe_builder_functions import mkt_cap_topn_universe_builder_fn
+    from qamsi.crsp_handler.universe_builder_functions import (
+        mkt_cap_topn_universe_builder_fn,
+    )
     from run import Dataset
 
     TOP_N = 30
     dataset = Dataset.TOPN_US
 
     settings = dataset.value(topn=TOP_N)
-    create_dataset(config=settings, prefix=f"top{TOP_N}_", universe_builder_fn=lambda cfg: mkt_cap_topn_universe_builder_fn(cfg, topn=TOP_N))
+    create_dataset(
+        config=settings,
+        prefix=f"top{TOP_N}_",
+        universe_builder_fn=lambda cfg: mkt_cap_topn_universe_builder_fn(
+            cfg, topn=TOP_N
+        ),
+    )

@@ -7,7 +7,9 @@ from typing import Callable
 import pandas as pd
 
 from qamsi.crsp_handler.create_dataset import create_dataset
-from qamsi.crsp_handler.universe_builder_functions import mkt_cap_topn_universe_builder_fn
+from qamsi.crsp_handler.universe_builder_functions import (
+    mkt_cap_topn_universe_builder_fn,
+)
 from qamsi.features.dnk_features_targets import create_dnk_features_targets
 from qamsi.utils.data import read_csv
 from qamsi.config.experiment_config import BaseExperimentConfig
@@ -58,13 +60,17 @@ def build_dataset(
     return DatasetData(data=data_df, presence_matrix=presence_matrix)
 
 
-def build_dnk_dataset(config: TopNExperimentConfig, verbose: bool = False) -> DatasetData:
+def build_dnk_dataset(
+    config: TopNExperimentConfig, verbose: bool = False
+) -> DatasetData:
     topn = config.topn
     prefix = f"top{topn}_"
     return build_dataset(
         config=config,
         prefix=prefix,
-        universe_builder_fn=lambda data: mkt_cap_topn_universe_builder_fn(data, topn=topn),
+        universe_builder_fn=lambda data: mkt_cap_topn_universe_builder_fn(
+            data, topn=topn
+        ),
         features_targets_fn=create_dnk_features_targets,
         verbose=verbose,
     )
