@@ -14,7 +14,7 @@ from qamsi.utils.corr import avg_corr
 
 
 def _load_data(config: BaseExperimentConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
-    filename = config.PREFIX + config.TRADE_DATASET_TMP_FILENAME
+    filename = config.PREFIX + config.DF_FILENAME
     pm_filename = config.PREFIX + config.PRESENCE_MATRIX_FILENAME
     data = read_csv(config.PATH_OUTPUT, filename)
 

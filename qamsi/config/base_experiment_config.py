@@ -9,7 +9,7 @@ import pandas as pd
 @dataclass
 class BaseExperimentConfig:
     PREFIX: str = field(
-        default="crsp",
+        default="crsp_",
         metadata={"docs": "Prefix for all output files to define dataset"},
     )
 
@@ -52,7 +52,7 @@ class BaseExperimentConfig:
     )
 
     SAVE_PATH: Path = field(
-        default=Path(__file__).resolve().parents[1] / "final_results" / "runs",
+        default=Path(__file__).resolve().parents[2] / "final_results" / "runs",
         metadata={"docs": "Relative path to data folder"},
     )
 
@@ -139,7 +139,7 @@ class BaseExperimentConfig:
     )
 
     MIN_ROLLING_PERIODS: int = field(
-        default=12,
+        default=1,
         metadata={"docs": "Number of minimum rebalance periods to run the strategy"},
     )
 

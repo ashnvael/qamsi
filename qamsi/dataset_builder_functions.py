@@ -6,21 +6,25 @@ from typing import Callable
 
 import pandas as pd
 
-from qamsi.crsp_handler.create_dataset import create_dataset
+from qamsi.crsp_handler.create_crsp_dataset import create_crsp_dataset
 from qamsi.crsp_handler.universe_builder_functions import (
-    mkt_cap_topn_universe_builder_fn, mkt_cap_quantile_universe_builder_fn,
+    mkt_cap_topn_universe_builder_fn,
+    mkt_cap_quantile_universe_builder_fn,
 )
 from qamsi.features.dnk_features_targets import create_dnk_features_targets
 from qamsi.utils.data import read_csv
 from qamsi.config.base_experiment_config import BaseExperimentConfig
 from qamsi.config.topn_experiment_config import TopNExperimentConfig
 from qamsi.config.jkp_experiment_config import JKPExperimentConfig
+from qamsi.config.spx_experiment_config import SPXExperimentConfig
 
 
 @dataclass
 class DatasetData:
     data: pd.DataFrame
     presence_matrix: pd.DataFrame
+    mkt_cap: pd.DataFrame | None = None
+    adj_price: pd.DataFrame | None = None
 
 
 def build_dataset(
@@ -46,7 +50,7 @@ def build_dataset(
     if df_filename not in available_files or pm_filename not in available_files:
         if verbose:
             print("Creating returns dataset...")
-        create_dataset(config=config, universe_builder_fn=universe_builder_fn)
+        create_crsp_dataset(config=config, universe_builder_fn=universe_builder_fn)
 
         if features_targets_fn is not None:
             if verbose:
@@ -78,18 +82,53 @@ def build_jkp_dataset(
     return build_dataset(
         config=config,
         universe_builder_fn=lambda data: mkt_cap_quantile_universe_builder_fn(
-            data, quantile=config.QUANTILE,
+            data,
+            quantile=config.MCAP_SELECTION_QUANTILE,
         ),
         features_targets_fn=None,
         verbose=verbose,
     )
 
 
+def build_spx_dataset(
+    config: SPXExperimentConfig,
+    spx_presence_matrix: pd.DataFrame,
+    verbose: bool = False,
+) -> DatasetData:
+    return build_dataset(
+        config=config,
+        universe_builder_fn=lambda data: spx_presence_matrix,
+        features_targets_fn=None,
+        verbose=verbose,
+    )
+
+
 if __name__ == "__main__":
+    # from run import Dataset
+    #
+    # TOP_N = 30
+    # dataset = Dataset.TOPN_US
+    #
+    # settings = dataset.value(topn=TOP_N)
+    # dataset = build_dnk_dataset(settings, verbose=True)
+
+    # from run import Dataset
+    #
+    # dataset = Dataset.JKP
+    #
+    # settings = dataset.value()
+    # dataset = build_jkp_dataset(settings, verbose=True)
+
     from run import Dataset
 
-    TOP_N = 30
-    dataset = Dataset.TOPN_US
+    dataset = Dataset.SPX_US
 
-    settings = dataset.value(topn=TOP_N)
-    dataset = build_dnk_dataset(settings, verbose=True)
+    settings = dataset.value()
+
+    pm = read_csv(
+        settings.PATH_OUTPUT,
+        settings.PREFIX + settings.PRESENCE_MATRIX_FILENAME,
+        date_column="caldt",
+        rename_column=True,
+    )
+    dataset = build_spx_dataset(settings, spx_presence_matrix=pm, verbose=True)
