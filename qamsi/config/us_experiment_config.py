@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pandas as pd
-from qamsi.config.experiment_config import BaseExperimentConfig
+from qamsi.config.base_experiment_config import BaseExperimentConfig
 
 
 @dataclass

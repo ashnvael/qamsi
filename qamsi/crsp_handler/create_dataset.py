@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from qamsi.config.experiment_config import BaseExperimentConfig
+from qamsi.config.base_experiment_config import BaseExperimentConfig
 from qamsi.utils.data import read_csv
 
 

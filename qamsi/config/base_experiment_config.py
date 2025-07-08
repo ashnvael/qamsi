@@ -52,7 +52,7 @@ class BaseExperimentConfig:
     )
 
     SAVE_PATH: Path = field(
-        default=Path(__file__).resolve().parents[1] / "backtests" / "runs",
+        default=Path(__file__).resolve().parents[1] / "final_results" / "runs",
         metadata={"docs": "Relative path to data folder"},
     )
 

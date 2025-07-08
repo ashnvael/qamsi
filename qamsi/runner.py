@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qamsi.config.experiment_config import BaseExperimentConfig
+    from qamsi.config.base_experiment_config import BaseExperimentConfig
     from qamsi.config.trading_config import TradingConfig
     from qamsi.features.preprocessor import Preprocessor
     from qamsi.hedge.base_hedger import BaseHedger

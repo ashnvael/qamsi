@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.covariance import LedoitWolf
 from tqdm import tqdm
 
-from qamsi.config.experiment_config import BaseExperimentConfig
+from qamsi.config.base_experiment_config import BaseExperimentConfig
 from qamsi.config.topn_experiment_config import TopNExperimentConfig
 from qamsi.utils.data import read_csv
 from qamsi.utils.corr import avg_corr
