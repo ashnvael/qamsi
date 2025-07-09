@@ -104,31 +104,10 @@ def build_spx_dataset(
 
 
 if __name__ == "__main__":
-    # from run import Dataset
-    #
-    # TOP_N = 30
-    # dataset = Dataset.TOPN_US
-    #
-    # settings = dataset.value(topn=TOP_N)
-    # dataset = build_dnk_dataset(settings, verbose=True)
-
-    # from run import Dataset
-    #
-    # dataset = Dataset.JKP
-    #
-    # settings = dataset.value()
-    # dataset = build_jkp_dataset(settings, verbose=True)
-
     from run import Dataset
 
-    dataset = Dataset.SPX_US
+    TOP_N = 500
+    dataset = Dataset.TOPN_US
 
-    settings = dataset.value()
-
-    pm = read_csv(
-        settings.PATH_OUTPUT,
-        settings.PREFIX + settings.PRESENCE_MATRIX_FILENAME,
-        date_column="caldt",
-        rename_column=True,
-    )
-    dataset = build_spx_dataset(settings, spx_presence_matrix=pm, verbose=True)
+    settings = dataset.value(topn=TOP_N)
+    dataset = build_dnk_dataset(settings, verbose=True)
