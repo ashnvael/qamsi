@@ -15,8 +15,10 @@ from imitation.util.networks import RunningNorm
 from imitation.policies import serialize
 from imitation.data import rollout, types
 
+from qamsi.config.trading_config import TradingConfig
 from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 from qamsi.cov_estimators.rl.env import make_env, make_optimal_env
+from run import initialize, Dataset
 
 
 class ExpertPolicy(NonTrainablePolicy):
@@ -42,6 +44,10 @@ class IRLCovEstimator(BaseRLCovEstimator):
         shrinkage_type: str,
         imitation_trainer_cls: Type[DemonstrationAlgorithm],
         policy_builder: Callable[[DummyVecEnv], BaseAlgorithm],
+        dataset: Dataset,
+        trading_config: TradingConfig,
+        rebal_freq: str,
+        topn: int | None = None,
         save_path: Path | None = None,
         window_size: int | None = None,
         use_saved_policy: bool = False,
@@ -55,6 +61,14 @@ class IRLCovEstimator(BaseRLCovEstimator):
 
         self.imitation_trainer_cls = imitation_trainer_cls
         self.policy_builder = policy_builder
+
+        # TODO(@V): Fix to a proper backtest call from within the estimator
+        _, self.runner = initialize(
+            dataset=dataset,
+            trading_config=trading_config,
+            topn=topn,
+            rebal_freq=rebal_freq,
+        )
 
         self._has_saved_policy = False
 
@@ -81,7 +95,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
         env = DummyVecEnv(
             [
                 make_env(
-                    experiment_runner=runner,
+                    experiment_runner=self.runner,
                     features=features,
                     init_min_reward=shrinkage_target.min(),
                     init_max_reward=shrinkage_target.max(),
@@ -98,7 +112,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
             optimal_env = DummyVecEnv(
                 [
                     make_optimal_env(
-                        experiment_runner=runner,
+                        experiment_runner=self.runner,
                         optimal_vol=shrinkage_target,
                         features=features,
                     )

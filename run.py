@@ -7,6 +7,7 @@ from qamsi.config.trading_config import TradingConfig
 from qamsi.backtest.assessor import StrategyStatistics
 from qamsi.runner import Runner
 from qamsi.strategies.estimated.min_var import MinVariance
+from qamsi.cov_estimators.base_cov_estimator import BaseCovEstimator
 from qamsi.cov_estimators.cov_estimators import CovEstimators
 from qamsi.features.preprocessor import Preprocessor
 from qamsi.dataset_builder_functions import build_dnk_dataset
@@ -26,18 +27,15 @@ REBAL_FREQ = "ME"
 
 TOP_N = 30
 DATASET = Dataset.TOPN_US
-
-ESTIMATION_WINDOW = 365 * 1
-ESTIMATOR = CovEstimators.DNK.value(shrinkage_type="linear", window_size=365 * 20)
-
 SAVE = True
+ESTIMATION_WINDOW = 365 * 1
 
 TRADING_CONFIG = TradingConfig(
     broker_fee=0.05 / 100,
     bid_ask_spread=0.03 / 100,
     total_exposure=1,
-    max_exposure=1,
-    min_exposure=0,
+    max_exposure=None,
+    min_exposure=None,
     trading_lag_days=1,
 )
 
@@ -82,24 +80,31 @@ def initialize(
     return preprocessor, runner
 
 
-def run_backtest() -> StrategyStatistics:
+def run_backtest(
+        estimator: BaseCovEstimator,
+        dataset: Dataset = DATASET,
+        rebal_freq: str = REBAL_FREQ,
+        trading_config: TradingConfig = TRADING_CONFIG,
+        estimation_window: int = ESTIMATION_WINDOW,
+        topn: int | None = None,
+        save: bool = SAVE,
+) -> StrategyStatistics:
     preprocessor, runner = initialize(
-        dataset=DATASET,
+        dataset=dataset,
         with_causal_window=True,
-        trading_config=TRADING_CONFIG,
-        rebal_freq=REBAL_FREQ,
-        topn=TOP_N,
+        trading_config=trading_config,
+        rebal_freq=rebal_freq,
+        topn=topn,
     )
-    trading_config = TRADING_CONFIG
 
     strategy = MinVariance(
-        cov_estimator=ESTIMATOR,
+        cov_estimator=estimator,
         trading_config=trading_config,
-        window_size=ESTIMATION_WINDOW,
+        window_size=estimation_window,
     )
 
     print("Running backtest...")
-    print(f"Estimation window: {ESTIMATION_WINDOW}")
+    print(f"Estimation window: {estimation_window}")
 
     result = runner(
         feature_processor=preprocessor,
@@ -107,10 +112,10 @@ def run_backtest() -> StrategyStatistics:
         hedger=None,
     )
 
-    strategy_name = ESTIMATOR.__class__.__name__
+    strategy_name = estimator.__class__.__name__
 
-    if SAVE:
-        runner.save(f"{DATASET.name}_" + strategy_name + f"_rebal{REBAL_FREQ}")
+    if save:
+        runner.save(f"{dataset.name}_{topn}_" + strategy_name + f"_rebal{rebal_freq}")
 
     runner.plot_cumulative(
         strategy_name=strategy_name,
@@ -125,6 +130,7 @@ def run_backtest() -> StrategyStatistics:
 
 
 if __name__ == "__main__":
-    run_result = run_backtest()
+    estimator = CovEstimators.DNK.value(shrinkage_type="linear", window_size=365 * 20)
+    run_result = run_backtest(estimator=estimator)
 
     print(run_result)  # noqa: T201
