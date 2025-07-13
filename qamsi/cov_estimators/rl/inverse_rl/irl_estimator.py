@@ -67,6 +67,8 @@ class IRLCovEstimator(BaseRLCovEstimator):
         self.policy_builder = policy_builder
         self.refit_policy = refit_policy
 
+        trading_config.trading_lag_days = 0
+
         # TODO(@V): Fix to a proper backtest call from within the estimator
         _, self.runner = initialize(
             dataset=dataset,
