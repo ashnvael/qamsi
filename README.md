@@ -12,6 +12,60 @@ University of Zürich
 git clone https://github.com/ashnvael/qamsi.git
 ```
 
+## How To Run an Inverse RL Backtest
+
+```
+from imitation.algorithms.adversarial.airl import AIRL
+from stable_baselines3 import SAC
+
+from qamsi.cov_estimators.rl.inverse_rl.irl_estimator import IRLCovEstimator
+from qamsi.config.trading_config import TradingConfig
+
+from run import Dataset, run_backtest
+
+# Specify the model hyperparameters
+REBAL_FREQ = "ME" # Rebalance frequency (Month End)
+DATASET = Dataset.TOPN_US # Dataset (Top N largest stocks by Market Cap)
+TOP_N = 30
+ESTIMATION_WINDOW = 365 # Covariance matrix wstimation window in days
+TRAINING_WINDOW = 365 * 20 # Model training window
+
+# Specify the trading configurations
+trading_config = TradingConfig(
+    broker_fee=0, # Broker commission in decimals
+    bid_ask_spread=0, # Bid-ask spread in decimals
+    total_exposure=1, # Budget constraint
+    max_exposure=None, # Maximum weight constraint
+    min_exposure=None, # Minimum weight constraint
+    trading_lag_days=1, # Trading Lag
+)
+
+# Create an Inverse RL Estimator
+estimator = IRLCovEstimator(
+    shrinkage_type="linear",
+    imitation_trainer_cls=AIRL, # Specify the IRL algo
+    policy_builder=lambda env: SAC("MlpPolicy", env, verbose=0, device="mps"), # Specify a policy learner
+    dataset=DATASET,
+    trading_config=trading_config,
+    rebal_freq=REBAL_FREQ,
+    topn=TOP_N,
+    window_size=TRAINING_WINDOW, # Set to `None`, if want to use the full data available before each rebalancing date
+    use_saved_policy=False, # Whether to use a saved policy or retrain from scratch
+    random_seed=12,
+)
+
+run_result = run_backtest(
+    estimator=estimator,
+    dataset=dataset,
+    rebal_freq=rebal_freq,
+    trading_config=trading_config,
+    topn=top_n,
+)
+
+# Get the backtesting metrics
+print(result)
+```
+
 ## How To Create A New Covariance Estimator
 
 ```
@@ -87,7 +141,7 @@ ESTIMATION_WINDOW = 365 # Covariance matrix wstimation window in days
 TRAINING_WINDOW = 365 * 20 # Model training window
 
 # Initialize the RL Estimator from De Nard & Kostovic (2025)
-ESTIMATOR = CovEstimators.DNK.value(shrinkage_type="linear", window_size=)
+ESTIMATOR = CovEstimators.DNK.value(shrinkage_type="linear", window_size=TRAINING_WINDOW)
 
 # Specify the trading configurations
 trading_config = TradingConfig(
