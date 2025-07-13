@@ -141,21 +141,21 @@ class IRLCovEstimator(BaseRLCovEstimator):
                 )
                 self.trainer = self.imitation_trainer_cls(
                     demonstrations=rollouts,
-                    demo_batch_size=1024,
+                    demo_batch_size=50,
                     gen_replay_buffer_capacity=512,
                     n_disc_updates_per_round=8,
                     venv=env,
                     gen_algo=self.policy,
                     reward_net=self.reward_net,
                 )
-                self.trainer.train(features.shape[0])
+                self.trainer.train(features.shape[0] - 1)
                 self.policy = self.trainer.policy
 
             if self.save_path is not None:
                 self._save()
 
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:
-        action, _ = self.policy.predict(features.to_numpy(), deterministic=True)
+        action, _ = self.policy.predict(features.to_numpy().astype(np.float32), deterministic=True)
         return action.item()
 
     def _save(self) -> None:
