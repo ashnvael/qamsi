@@ -43,7 +43,7 @@ TRADING_CONFIG = TradingConfig(
 def initialize(
     dataset: Dataset,
     with_causal_window: bool = True,
-    start: str | None = pd.Timestamp("1983-01-01"),
+    start: str | None = None,
     end: str | None = None,
     trading_config: TradingConfig = TRADING_CONFIG,
     rebal_freq: str = REBAL_FREQ,
