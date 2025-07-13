@@ -150,7 +150,9 @@ class BaseExperimentConfig:
 
     CAUSAL_WINDOW_END_DATE_FIELD: str | None = field(
         default=None,
-        metadata={"docs": "Field name for last date, required for datapoint to be available. Overrides `CAUSIAL_WINDOW_SIZE` (!)"},
+        metadata={
+            "docs": "Field name for last date, required for datapoint to be available. Overrides `CAUSIAL_WINDOW_SIZE` (!)"
+        },
     )
 
     # Universe Setting

@@ -258,12 +258,20 @@ class Backtester:
         train_targets = self.targets.loc[:pred_date]
 
         if self.causal_window_end_date_field is not None:
-            train_targets[self.causal_window_end_date_field] = pd.to_datetime(train_targets[self.causal_window_end_date_field])
-            train_targets = train_targets.reset_index().set_index(self.causal_window_end_date_field)
+            train_targets[self.causal_window_end_date_field] = pd.to_datetime(
+                train_targets[self.causal_window_end_date_field]
+            )
+            train_targets = train_targets.reset_index().set_index(
+                self.causal_window_end_date_field
+            )
             train_targets = train_targets[train_targets.index <= pred_date]
-            train_targets = train_targets.reset_index().drop(columns=[self.causal_window_end_date_field]).set_index("date")
+            train_targets = (
+                train_targets.reset_index()
+                .drop(columns=[self.causal_window_end_date_field])
+                .set_index("date")
+            )
         elif self.causal_window_size is not None:
-            train_targets = train_targets.iloc[:-self.causal_window_size]
+            train_targets = train_targets.iloc[: -self.causal_window_size]
 
         train_targets = train_targets.iloc[1:]
         train_rf = self.rf.loc[:pred_date].iloc[1:]

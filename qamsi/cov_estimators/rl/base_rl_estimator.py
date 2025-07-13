@@ -77,22 +77,30 @@ class BaseRLCovEstimator(BaseCovEstimator):
                     [self._seen_targets, new_targets], axis=0
                 )
 
-    def _extract_features_targets(self, training_data: TrainingData) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    def _extract_features_targets(
+        self, training_data: TrainingData
+    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         feat = training_data.features
 
         if self.shrinkage_type == ShrinkageType.LINEAR:
             target = training_data.targets["target"]
-            target_hist = self._seen_targets[["target"]].rename(columns={"target": "lagged_target"})
+            target_hist = self._seen_targets[["target"]].rename(
+                columns={"target": "lagged_target"}
+            )
         elif self.shrinkage_type == ShrinkageType.QIS:
             target = training_data.targets["qis_shrinkage"]
-            target_hist = self._seen_targets[["qis_shrinkage"]].rename(columns={"qis_shrinkage": "lagged_target"})
+            target_hist = self._seen_targets[["qis_shrinkage"]].rename(
+                columns={"qis_shrinkage": "lagged_target"}
+            )
         else:
             msg = f"Unknown shrinkage type: {self.shrinkage_type}"
             raise NotImplementedError(msg)
 
         return feat, target, target_hist
 
-    def _filter_estimation_window(self, features: pd.DataFrame, target: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
+    def _filter_estimation_window(
+        self, features: pd.DataFrame, target: pd.Series
+    ) -> tuple[pd.DataFrame, pd.Series]:
         start_date = (
             target.index[-1] - pd.Timedelta(days=self.window_size)
             if self.window_size is not None
@@ -104,7 +112,9 @@ class BaseRLCovEstimator(BaseCovEstimator):
         return features, target
 
     @staticmethod
-    def _filter_valid_dates_range(features: pd.DataFrame, target: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
+    def _filter_valid_dates_range(
+        features: pd.DataFrame, target: pd.Series
+    ) -> tuple[pd.DataFrame, pd.Series]:
         first_feat_date = features.dropna(axis=0, how="any").first_valid_index()
         last_feat_date = features.dropna(axis=0, how="any").last_valid_index()
 
@@ -146,18 +156,25 @@ class BaseRLCovEstimator(BaseCovEstimator):
 
         return features
 
-    def _append_lagged_target(self, features: pd.DataFrame, target: pd.Series, target_history: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    def _append_lagged_target(
+        self, features: pd.DataFrame, target: pd.Series, target_history: pd.DataFrame
+    ) -> tuple[pd.DataFrame, pd.Series]:
         add_features = target_history.copy()
         add_features["target_rolling_mean"] = (
             add_features["lagged_target"].rolling(window=252, min_periods=1).mean()
         )
         add_features["target_rolling_vol"] = (
-            add_features["lagged_target"].rolling(window=252, min_periods=1).std().fillna(0)
+            add_features["lagged_target"]
+            .rolling(window=252, min_periods=1)
+            .std()
+            .fillna(0)
         )
         self._pred_lagged_tgt = add_features.iloc[-1:, :]
         add_features = add_features.shift(1)
 
-        features = pd.merge(features, add_features, how="left", left_index=True, right_index=True)
+        features = pd.merge(
+            features, add_features, how="left", left_index=True, right_index=True
+        )
         first_lagged_date = features.dropna(axis=0, how="any").first_valid_index()
 
         features = features.loc[first_lagged_date:]

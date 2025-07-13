@@ -33,9 +33,7 @@ class BanditEnvironment(gymnasium.Env):
 
         self.experiment_runner = experiment_runner
 
-        self.features = features.astype(
-            np.float32
-        )
+        self.features = features.astype(np.float32)
 
         self.action_space = spaces.Box(low=0, high=1, dtype=np.float32)
 
@@ -144,13 +142,9 @@ class OptimalEnvironment(gymnasium.Env):
 
         self.experiment_runner = experiment_runner
 
-        self.features = features.astype(
-            np.float32
-        )
+        self.features = features.astype(np.float32)
 
-        self.optimal_rewards = vol_to_reward(optimal_vol).astype(
-            np.float32
-        )
+        self.optimal_rewards = vol_to_reward(optimal_vol).astype(np.float32)
 
         self.action_space = spaces.Box(low=0, high=1, dtype=np.float32)
 

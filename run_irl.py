@@ -37,6 +37,12 @@ if __name__ == "__main__":
         random_seed=12,
     )
 
-    run_result = run_backtest(estimator=estimator, dataset=dataset, rebal_freq=rebal_freq, trading_config=trading_config, topn=top_n)
+    run_result = run_backtest(
+        estimator=estimator,
+        dataset=dataset,
+        rebal_freq=rebal_freq,
+        trading_config=trading_config,
+        topn=top_n,
+    )
 
     print(run_result)  # noqa: T201

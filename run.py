@@ -82,13 +82,13 @@ def initialize(
 
 
 def run_backtest(
-        estimator: BaseCovEstimator,
-        dataset: Dataset = DATASET,
-        rebal_freq: str = REBAL_FREQ,
-        trading_config: TradingConfig = TRADING_CONFIG,
-        estimation_window: int = ESTIMATION_WINDOW,
-        topn: int | None = None,
-        save: bool = SAVE,
+    estimator: BaseCovEstimator,
+    dataset: Dataset = DATASET,
+    rebal_freq: str = REBAL_FREQ,
+    trading_config: TradingConfig = TRADING_CONFIG,
+    estimation_window: int = ESTIMATION_WINDOW,
+    topn: int | None = None,
+    save: bool = SAVE,
 ) -> StrategyStatistics:
     preprocessor, runner = initialize(
         dataset=dataset,

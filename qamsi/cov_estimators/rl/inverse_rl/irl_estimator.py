@@ -27,9 +27,7 @@ class ExpertPolicy(NonTrainablePolicy):
         super().__init__(
             observation_space=env.observation_space, action_space=env.action_space
         )
-        self.policy = optimal_policy.to_numpy().astype(
-            np.float32
-        )
+        self.policy = optimal_policy.to_numpy().astype(np.float32)
         self.current_id = 0
 
     def _choose_action(
@@ -113,7 +111,11 @@ class IRLCovEstimator(BaseRLCovEstimator):
                 ]
             )
 
-            if self._has_saved_policy and self.use_saved_policy and self.save_path is not None:
+            if (
+                self._has_saved_policy
+                and self.use_saved_policy
+                and self.save_path is not None
+            ):
                 self.policy = serialize.load_stable_baselines_model(
                     self.policy.__class__, path=str(self.save_path), venv=env
                 )
@@ -152,14 +154,18 @@ class IRLCovEstimator(BaseRLCovEstimator):
                     reward_net=self.reward_net,
                 )
                 # Use `clear_output()` in callback for better Jupyter performance
-                self.trainer.train(features.shape[0] - 1, callback=lambda x: clear_output())
+                self.trainer.train(
+                    features.shape[0] - 1, callback=lambda x: clear_output()
+                )
                 self.policy = self.trainer.policy
 
             if self.save_path is not None:
                 self._save()
 
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:
-        action, _ = self.policy.predict(features.to_numpy().astype(np.float32), deterministic=True)
+        action, _ = self.policy.predict(
+            features.to_numpy().astype(np.float32), deterministic=True
+        )
         return action.item()
 
     def _save(self) -> None:
