@@ -34,6 +34,8 @@ from qamsi.cov_estimators.rl.behavioral_cloning.rf_estimator import (
 from qamsi.cov_estimators.rl.behavioral_cloning.xgb_estimator import XGBCovEstimator
 from qamsi.cov_estimators.rl.behavioral_cloning.dl_estimator import DLCovEstimator
 
+from qamsi.cov_estimators.rl.behavioral_cloning.rf_xiu_estimator import RandomForestXiuCovEstimator
+
 
 class CovEstimators(Enum):
     HISTORICAL = HistoricalCovEstimator
@@ -61,3 +63,5 @@ class CovEstimators(Enum):
     RF = RandomForestCovEstimator
     XGB = XGBCovEstimator
     DEEP_LEARNING = DLCovEstimator
+
+    RF_XIU = RandomForestXiuCovEstimator

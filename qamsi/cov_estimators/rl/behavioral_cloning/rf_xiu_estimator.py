@@ -26,9 +26,19 @@ class RandomForestXiuCovEstimator(BaseRLCovEstimator):
                 f"{features.index.min()}-{features.index.max()}: Encountered NaN in shrinkage target."
             )
         else:
+            # self.rf = RandomForestRegressor(
+            #     n_estimators=500,
+            #     max_depth=...,
+            #     max_features=...,
+            #     max_samples=...,
+            #     random_state=12,
+            # )
+
             self.rf = RandomForestRegressor(
-                n_estimators=30,
+                n_estimators=500,
                 max_depth=10,
+                max_features=5,
+                max_samples=0.5,
                 random_state=12,
             )
             self.rf.fit(X=features, y=shrinkage_target)
