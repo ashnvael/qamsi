@@ -49,8 +49,13 @@ class USExperimentConfig(BaseExperimentConfig):
     )
 
     CAUSAL_WINDOW_SIZE: int | None = field(
-        default=30,
+        default=21,
         metadata={"docs": "Number of days that are not available at rebalancing"},
+    )
+
+    CAUSAL_WINDOW_END_DATE_FIELD: str | None = field(
+        default="end_date",
+        metadata={"docs": "Field name for last date, required for datapoint to be available. Overrides `CAUSIAL_WINDOW_SIZE` (!)"},
     )
 
     # Universe Setting
@@ -80,6 +85,7 @@ class USExperimentConfig(BaseExperimentConfig):
             "vol",
             "naive_vol",
             "target",
+            "end_date",
         ),
         metadata={"docs": "ML Targets"},
     )

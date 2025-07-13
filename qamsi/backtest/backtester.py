@@ -37,6 +37,7 @@ class Backtester:
         rebal_freq: int | str | None,
         hedge_freq: int | str | None,
         presence_matrix: pd.DataFrame | None = None,
+        causal_window_end_date_field: str | None = None,
         causal_window_size: int | None = None,
         verbose: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
@@ -63,7 +64,9 @@ class Backtester:
         self.rebal_freq = rebal_freq
         self.hedge_freq = hedge_freq
         self.presence_matrix = presence_matrix
-        self.causal_window_size = causal_window_size
+        self.causal_window_end_date_field = causal_window_end_date_field
+        if self.causal_window_end_date_field is not None:
+            self.causal_window_size = None
         self.verbose = verbose
 
         self._strategy_total_r = None
@@ -253,13 +256,17 @@ class Backtester:
 
         train_factors = self.factors.loc[:pred_date].iloc[1:]
         train_targets = self.targets.loc[:pred_date]
-        train_targets = (
-            train_targets.iloc[1 : -self.causal_window_size]
-            if self.causal_window_size is not None
-            else train_targets.iloc[1:]
-        )
-        train_rf = self.rf.loc[:pred_date].iloc[1:]
 
+        if self.causal_window_end_date_field is not None:
+            train_targets[self.causal_window_end_date_field] = pd.to_datetime(train_targets[self.causal_window_end_date_field])
+            train_targets = train_targets.reset_index().set_index(self.causal_window_end_date_field)
+            train_targets = train_targets[train_targets.index <= pred_date]
+            train_targets = train_targets.reset_index().drop(columns=[self.causal_window_end_date_field]).set_index("date")
+        elif self.causal_window_size is not None:
+            train_targets = train_targets.iloc[:-self.causal_window_size]
+
+        train_targets = train_targets.iloc[1:]
+        train_rf = self.rf.loc[:pred_date].iloc[1:]
         simple_train_xs_r = (
             self.stocks_returns.simple_returns.loc[:pred_date]
             .iloc[1:]

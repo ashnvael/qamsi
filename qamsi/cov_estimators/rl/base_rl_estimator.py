@@ -53,6 +53,9 @@ class BaseRLCovEstimator(BaseCovEstimator):
         self._predictions = []
         self.trained_with_features = False
 
+        self._seen_targets = None
+        self._pred_lagged_tgt = None
+
     @abstractmethod
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
@@ -63,34 +66,47 @@ class BaseRLCovEstimator(BaseCovEstimator):
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:
         raise NotImplementedError
 
-    def _fit(self, training_data: TrainingData) -> None:
-        self._seen_training_data = training_data
+    def _adjust_target_history(self, new_targets: pd.DataFrame) -> None:
+        if self._seen_targets is None:
+            self._seen_targets = new_targets
+        else:
+            new_dates = new_targets.index.difference(self._seen_targets.index)
+            if len(new_dates) > 0:
+                new_targets = new_targets.loc[new_dates]
+                self._seen_targets = pd.concat(
+                    [self._seen_targets, new_targets], axis=0
+                )
 
-        if self._trained and not self.refit:
-            return
-
+    def _extract_features_targets(self, training_data: TrainingData) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         feat = training_data.features
 
         if self.shrinkage_type == ShrinkageType.LINEAR:
             target = training_data.targets["target"]
+            target_hist = self._seen_targets[["target"]].rename(columns={"target": "lagged_target"})
         elif self.shrinkage_type == ShrinkageType.QIS:
             target = training_data.targets["qis_shrinkage"]
+            target_hist = self._seen_targets[["qis_shrinkage"]].rename(columns={"qis_shrinkage": "lagged_target"})
         else:
             msg = f"Unknown shrinkage type: {self.shrinkage_type}"
             raise NotImplementedError(msg)
 
+        return feat, target, target_hist
+
+    def _filter_estimation_window(self, features: pd.DataFrame, target: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
         start_date = (
             target.index[-1] - pd.Timedelta(days=self.window_size)
             if self.window_size is not None
             else target.index[0]
         )
-        feat = feat.loc[start_date:]
+        features = features.loc[start_date:]
         target = target.loc[start_date:]
 
-        last_pred = self.predictions
+        return features, target
 
-        first_feat_date = feat.dropna(axis=0, how="any").first_valid_index()
-        last_feat_date = feat.dropna(axis=0, how="any").last_valid_index()
+    @staticmethod
+    def _filter_valid_dates_range(features: pd.DataFrame, target: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
+        first_feat_date = features.dropna(axis=0, how="any").first_valid_index()
+        last_feat_date = features.dropna(axis=0, how="any").last_valid_index()
 
         first_target_date = target.dropna(axis=0, how="any").first_valid_index()
         last_target_date = target.dropna(axis=0, how="any").last_valid_index()
@@ -104,25 +120,66 @@ class BaseRLCovEstimator(BaseCovEstimator):
             last_feat_date if last_target_date >= last_feat_date else last_target_date
         )
 
-        feat = feat.loc[first_date:last_date]
+        features = features.loc[first_date:last_date]
+        target = target.loc[first_date:last_date]
+
+        return features, target
+
+    def _append_last_prediction(self, features: pd.DataFrame) -> pd.DataFrame:
+        last_pred = self.predictions
         if not last_pred.empty:
-            feat = pd.merge_asof(
-                feat,
+            features = pd.merge_asof(
+                features,
                 last_pred,
                 left_index=True,
                 right_index=True,
                 tolerance=pd.Timedelta("1D"),
             ).ffill()
 
-            if feat["prediction"].isna().any():
-                feat = feat.drop(["prediction"], axis=1)
+            if features["prediction"].isna().any():
+                features = features.drop(["prediction"], axis=1)
                 self.trained_with_features = False
             else:
                 self.trained_with_features = True
         else:
             self.trained_with_features = False
 
-        target = target.loc[first_date:last_date]
+        return features
+
+    def _append_lagged_target(self, features: pd.DataFrame, target: pd.Series, target_history: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+        add_features = target_history.copy()
+        add_features["target_rolling_mean"] = (
+            add_features["lagged_target"].rolling(window=252, min_periods=1).mean()
+        )
+        add_features["target_rolling_vol"] = (
+            add_features["lagged_target"].rolling(window=252, min_periods=1).std().fillna(0)
+        )
+        self._pred_lagged_tgt = add_features.iloc[-1:, :]
+        add_features = add_features.shift(1)
+
+        features = pd.merge(features, add_features, how="left", left_index=True, right_index=True)
+        first_lagged_date = features.dropna(axis=0, how="any").first_valid_index()
+
+        features = features.loc[first_lagged_date:]
+        target = target.loc[first_lagged_date:]
+
+        return features, target
+
+    def _fit(self, training_data: TrainingData) -> None:
+        self._seen_training_data = training_data
+
+        if self._trained and not self.refit:
+            return
+
+        self._adjust_target_history(training_data.targets)
+
+        feat, target, target_hist = self._extract_features_targets(training_data)
+
+        feat, target = self._filter_estimation_window(feat, target)
+        feat, target = self._filter_valid_dates_range(feat, target)
+
+        feat = self._append_last_prediction(feat)
+        feat, target = self._append_lagged_target(feat, target, target_hist)
 
         feat_transf = self.feat_scaler.fit_transform(feat)
         feat = pd.DataFrame(feat_transf, index=feat.index, columns=feat.columns)
@@ -134,18 +191,16 @@ class BaseRLCovEstimator(BaseCovEstimator):
         feat = prediction_data.features
         if not self.predictions.empty and self.trained_with_features:
             feat["prediction"] = self.predictions.iloc[-1].item()
+
+        feat[self._pred_lagged_tgt.columns] = self._pred_lagged_tgt.to_numpy()
+
         feat_transformed = self.feat_scaler.transform(feat)
         feat = pd.DataFrame(feat_transformed, index=feat.index, columns=feat.columns)
 
         pred_shrinkage = self._predict_shrinkage(feat)
 
-        pred_shrinkage = (
-            np.clip(pred_shrinkage, 0, 1)
-            if self.shrinkage_type == ShrinkageType.LINEAR
-            else pred_shrinkage
-        )
-
         if self.shrinkage_type == ShrinkageType.LINEAR:
+            pred_shrinkage = np.clip(pred_shrinkage, 0, 1)
             self.shrinkage.alpha = pred_shrinkage
         elif self.shrinkage_type == ShrinkageType.QIS:
             self.shrinkage.shrinkage = pred_shrinkage

@@ -154,6 +154,7 @@ class Runner:
             hedge_freq=hedge_freq,
             presence_matrix=self.presence_matrix,
             causal_window_size=self.experiment_config.CAUSAL_WINDOW_SIZE,
+            causal_window_end_date_field=self.experiment_config.CAUSAL_WINDOW_END_DATE_FIELD,
             verbose=self.verbose,
             hedging_assets=hedging_assets_ret,
         )

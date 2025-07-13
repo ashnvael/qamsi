@@ -148,6 +148,11 @@ class BaseExperimentConfig:
         metadata={"docs": "Number of datapoints that are not available at rebalancing"},
     )
 
+    CAUSAL_WINDOW_END_DATE_FIELD: str | None = field(
+        default=None,
+        metadata={"docs": "Field name for last date, required for datapoint to be available. Overrides `CAUSIAL_WINDOW_SIZE` (!)"},
+    )
+
     # Universe Setting
     FACTORS: tuple[str] = field(
         default=(
