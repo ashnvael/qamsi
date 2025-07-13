@@ -44,7 +44,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
         policy_builder: Callable[[DummyVecEnv], BaseAlgorithm],
         save_path: Path | None = None,
         window_size: int | None = None,
-        use_saved_policy: bool = True,
+        use_saved_policy: bool = False,
         random_seed: int = 12,
     ) -> None:
         super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
@@ -55,6 +55,8 @@ class IRLCovEstimator(BaseRLCovEstimator):
 
         self.imitation_trainer_cls = imitation_trainer_cls
         self.policy_builder = policy_builder
+
+        self._has_saved_policy = False
 
     def collect_rollouts(
         self, env: DummyVecEnv, optimal_env: DummyVecEnv, optimal_actions: pd.Series
@@ -75,19 +77,31 @@ class IRLCovEstimator(BaseRLCovEstimator):
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
     ) -> None:
-        if ...:
+        n_envs = 1
+        env = DummyVecEnv(
+            [
+                make_env(
+                    experiment_runner=runner,
+                    features=features,
+                    init_min_reward=shrinkage_target.min(),
+                    init_max_reward=shrinkage_target.max(),
+                )
+                for _ in range(n_envs)
+            ]
+        )
+
+        if self._has_saved_policy and self.use_saved_policy and self.save_path is not None:
             self.policy = serialize.load_stable_baselines_model(
-                self.policy.__class__, path=str(self.save_path), venv=self.env
+                self.policy.__class__, path=str(self.save_path), venv=env
             )
         else:
-            n_envs = 1
-
-            rewards = ...
-
-            env = DummyVecEnv([make_env(self.shrinkage) for _ in range(n_envs)])
             optimal_env = DummyVecEnv(
                 [
-                    make_optimal_env(runner, true_optimal, start_date, train_end)
+                    make_optimal_env(
+                        experiment_runner=runner,
+                        optimal_vol=shrinkage_target,
+                        features=features,
+                    )
                     for _ in range(n_envs)
                 ]
             )
@@ -130,3 +144,4 @@ class IRLCovEstimator(BaseRLCovEstimator):
             self.policy,
             self.trainer.__class__.__name__ + f"_{self.policy.__class__.__name__}_",
         )
+        self._has_saved_policy = True

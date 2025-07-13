@@ -9,33 +9,31 @@ from imitation.data.wrappers import RolloutInfoWrapper
 import gymnasium
 from gymnasium import spaces
 
+from qamsi.runner import Runner
+from qamsi.cov_estimators.cov_estimators import CovEstimators
+from qamsi.strategies.estimated.min_var import MinVariance
+
+
+def vol_to_reward(volatility: float | pd.Series) -> float | pd.Series:
+    return -volatility
+
 
 class BanditEnvironment(gymnasium.Env):
     def __init__(
         self,
         experiment_runner: Runner,
-        start_date: pd.Timestamp,
-        train_end: pd.Timestamp,
-        min_reward: float,
-        max_reward: float,
+        features: pd.DataFrame,
+        init_min_reward: float,
+        init_max_reward: float,
     ) -> None:
         super().__init__()
 
-        self.min_reward = min_reward
-        self.max_reward = max_reward
+        self.min_reward = init_min_reward
+        self.max_reward = init_max_reward
 
         self.experiment_runner = experiment_runner
 
-        scaler = StandardScaler()
-
-        self.features = self.experiment_runner.features.astype(np.float32)
-        scaler.fit(self.features.loc[self.features.index < train_end])
-        self.features = scaler.transform(self.features)
-        self.features = pd.DataFrame(
-            self.features,
-            columns=self.experiment_runner.features.columns,
-            index=self.experiment_runner.features.index,
-        )
+        self.features = features
 
         self.action_space = spaces.Box(low=0, high=1, dtype=np.float32)
 
@@ -46,9 +44,7 @@ class BanditEnvironment(gymnasium.Env):
             dtype=np.float32,
         )
 
-        self.start_dates = self.experiment_runner.returns.simple_returns.loc[
-            start_date:
-        ].index
+        self.start_dates = self.features.index
         self.end_dates = [
             date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates
         ]
@@ -76,6 +72,15 @@ class BanditEnvironment(gymnasium.Env):
 
     def get_context(self):
         return self.features.loc[self.current_start].fillna(0).to_numpy().reshape(1, -1)
+
+    def min_max_scale_reward(self, reward: float) -> float:
+        if self.min_reward is not None and self.max_reward is not None:
+            if reward < self.min_reward:
+                self.min_reward = reward
+            if reward > self.max_reward:
+                self.max_reward = reward
+            return (reward - self.min_reward) / (self.max_reward - self.min_reward)
+        return reward
 
     def step(
         self, action: np.array
@@ -110,12 +115,7 @@ class BanditEnvironment(gymnasium.Env):
         vol = fitted_r.std().item()
 
         reward = vol_to_reward(vol)
-        if self.min_reward is not None and self.max_reward is not None:
-            if reward < self.min_reward:
-                self.min_reward = reward
-            if reward > self.max_reward:
-                self.max_reward = reward
-            reward = (reward - self.min_reward) / (self.max_reward - self.min_reward)
+        reward = self.min_max_scale_reward(reward)
 
         done = 1
 
@@ -135,27 +135,15 @@ class OptimalEnvironment(gymnasium.Env):
     def __init__(
         self,
         experiment_runner: Runner,
-        true_optimal: pd.DataFrame,
-        start_date: pd.Timestamp,
-        train_end: pd.Timestamp,
+        optimal_vol: pd.Series,
+        features: pd.DataFrame,
     ) -> None:
         super().__init__()
 
         self.experiment_runner = experiment_runner
-        self.true_optimal = true_optimal
+        self.features = features
 
-        scaler = StandardScaler()
-
-        self.features = self.experiment_runner.features.astype(np.float32)
-        scaler.fit(self.features.loc[self.features.index < train_end])
-        self.features = scaler.transform(self.features)
-        self.features = pd.DataFrame(
-            self.features,
-            columns=self.experiment_runner.features.columns,
-            index=self.experiment_runner.features.index,
-        )
-
-        self.optimal_rewards = vol_to_reward(self.true_optimal["vol"]).astype(
+        self.optimal_rewards = vol_to_reward(optimal_vol).astype(
             np.float32
         )
 
@@ -168,9 +156,7 @@ class OptimalEnvironment(gymnasium.Env):
             dtype=np.float32,
         )
 
-        self.start_dates = self.experiment_runner.returns.simple_returns.loc[
-            start_date:
-        ].index
+        self.start_dates = self.features.index
         self.end_dates = [
             date + pd.tseries.offsets.BDay(n=21) for date in self.start_dates
         ]
@@ -227,10 +213,9 @@ class OptimalEnvironment(gymnasium.Env):
 # Function to initialize an environment instance
 def make_env(
     experiment_runner: Runner,
-    start_date: pd.Timestamp,
-    train_end: pd.Timestamp,
-    min_reward: float,
-    max_reward: float,
+    features: pd.DataFrame,
+    init_min_reward: float,
+    init_max_reward: float,
 ) -> Callable:
     """
     Returns a callable that creates an instance of BanditEnvironment.
@@ -246,7 +231,7 @@ def make_env(
 
     def _init():
         return BanditEnvironment(
-            experiment_runner, start_date, train_end, min_reward, max_reward
+            experiment_runner, features, init_min_reward, init_max_reward
         )
 
     return _init
@@ -255,9 +240,8 @@ def make_env(
 # Function to initialize an environment instance
 def make_optimal_env(
     experiment_runner: Runner,
-    true_optimal: pd.DataFrame,
-    start_date: pd.Timestamp,
-    train_end: pd.Timestamp,
+    optimal_vol: pd.Series,
+    features: pd.DataFrame,
 ) -> Callable:
     """
     Returns a callable that creates an instance of BanditEnvironment.
@@ -273,7 +257,7 @@ def make_optimal_env(
 
     def _init():
         return RolloutInfoWrapper(
-            OptimalEnvironment(experiment_runner, true_optimal, start_date, train_end)
+            OptimalEnvironment(experiment_runner, optimal_vol, features)
         )
 
     return _init
