@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Type, Sequence
 from pathlib import Path
+from IPython.display import clear_output
 
 import numpy as np
 import pandas as pd
@@ -148,7 +149,8 @@ class IRLCovEstimator(BaseRLCovEstimator):
                     gen_algo=self.policy,
                     reward_net=self.reward_net,
                 )
-                self.trainer.train(features.shape[0] - 1)
+                # Use `clear_output()` in callback for better Jupyter performance
+                self.trainer.train(features.shape[0] - 1, callback=lambda x: clear_output())
                 self.policy = self.trainer.policy
 
             if self.save_path is not None:
