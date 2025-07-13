@@ -43,11 +43,12 @@ TRADING_CONFIG = TradingConfig(
 def initialize(
     dataset: Dataset,
     with_causal_window: bool = True,
-    start: str | None = None,
+    start: str | None = pd.Timestamp("1986-04-01"),
     end: str | None = None,
     trading_config: TradingConfig = TRADING_CONFIG,
     rebal_freq: str = REBAL_FREQ,
     topn: int | None = None,
+    verbose: bool = True,
 ) -> tuple[Preprocessor, Runner]:
     experiment_config = dataset.value(topn=topn) if topn else dataset.value()
 
@@ -71,10 +72,10 @@ def initialize(
     preprocessor = Preprocessor()
 
     runner = Runner(
-        dataset_builder_fn=lambda config: build_dnk_dataset(config, verbose=True),
+        dataset_builder_fn=lambda config: build_dnk_dataset(config, verbose=verbose),
         experiment_config=experiment_config,
         trading_config=trading_config,
-        verbose=True,
+        verbose=verbose,
     )
 
     return preprocessor, runner

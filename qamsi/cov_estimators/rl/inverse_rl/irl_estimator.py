@@ -26,7 +26,9 @@ class ExpertPolicy(NonTrainablePolicy):
         super().__init__(
             observation_space=env.observation_space, action_space=env.action_space
         )
-        self.policy = optimal_policy.to_numpy()
+        self.policy = optimal_policy.to_numpy().astype(
+            np.float32
+        )
         self.current_id = 0
 
     def _choose_action(
@@ -51,6 +53,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
         save_path: Path | None = None,
         window_size: int | None = None,
         use_saved_policy: bool = False,
+        refit_policy: bool = False,
         random_seed: int = 12,
     ) -> None:
         super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
@@ -61,6 +64,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
 
         self.imitation_trainer_cls = imitation_trainer_cls
         self.policy_builder = policy_builder
+        self.refit_policy = refit_policy
 
         # TODO(@V): Fix to a proper backtest call from within the estimator
         _, self.runner = initialize(
@@ -68,6 +72,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
             trading_config=trading_config,
             topn=topn,
             rebal_freq=rebal_freq,
+            verbose=False,
         )
 
         self._has_saved_policy = False
@@ -81,7 +86,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
             expert,
             optimal_env,
             rollout.make_sample_until(
-                min_timesteps=len(optimal_actions),
+                min_timesteps=len(optimal_actions) - 1,
                 min_episodes=None,
             ),
             rng=np.random.default_rng(self.random_seed),
@@ -91,62 +96,63 @@ class IRLCovEstimator(BaseRLCovEstimator):
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
     ) -> None:
-        n_envs = 1
-        env = DummyVecEnv(
-            [
-                make_env(
-                    experiment_runner=self.runner,
-                    features=features,
-                    init_min_reward=shrinkage_target.min(),
-                    init_max_reward=shrinkage_target.max(),
-                )
-                for _ in range(n_envs)
-            ]
-        )
-
-        if self._has_saved_policy and self.use_saved_policy and self.save_path is not None:
-            self.policy = serialize.load_stable_baselines_model(
-                self.policy.__class__, path=str(self.save_path), venv=env
-            )
-        else:
-            optimal_env = DummyVecEnv(
+        if self.refit_policy or not self._fitted:
+            n_envs = 1
+            env = DummyVecEnv(
                 [
-                    make_optimal_env(
+                    make_env(
                         experiment_runner=self.runner,
-                        optimal_vol=shrinkage_target,
                         features=features,
+                        init_min_reward=shrinkage_target.min(),
+                        init_max_reward=shrinkage_target.max(),
                     )
                     for _ in range(n_envs)
                 ]
             )
 
-            self.policy = self.policy_builder(env)
+            if self._has_saved_policy and self.use_saved_policy and self.save_path is not None:
+                self.policy = serialize.load_stable_baselines_model(
+                    self.policy.__class__, path=str(self.save_path), venv=env
+                )
+            else:
+                optimal_env = DummyVecEnv(
+                    [
+                        make_optimal_env(
+                            experiment_runner=self.runner,
+                            optimal_vol=shrinkage_target,
+                            features=features,
+                        )
+                        for _ in range(n_envs)
+                    ]
+                )
 
-            self.reward_net = BasicShapedRewardNet(
-                observation_space=env.observation_space,
-                action_space=env.action_space,
-                normalize_input_layer=RunningNorm,
-            )
+                self.policy = self.policy_builder(env)
 
-            rollouts = self.collect_rollouts(
-                env=env,
-                optimal_env=optimal_env,
-                optimal_actions=shrinkage_target,
-            )
-            self.trainer = self.imitation_trainer_cls(
-                demonstrations=rollouts,
-                demo_batch_size=1024,
-                gen_replay_buffer_capacity=512,
-                n_disc_updates_per_round=8,
-                venv=self.env,
-                gen_algo=self.policy,
-                reward_net=self.reward_net,
-            )
-            self.trainer.train(len(self.env))
-            self.policy = self.trainer.policy
+                self.reward_net = BasicShapedRewardNet(
+                    observation_space=env.observation_space,
+                    action_space=env.action_space,
+                    normalize_input_layer=RunningNorm,
+                )
 
-        if self.save_path is not None:
-            self._save()
+                rollouts = self.collect_rollouts(
+                    env=env,
+                    optimal_env=optimal_env,
+                    optimal_actions=shrinkage_target,
+                )
+                self.trainer = self.imitation_trainer_cls(
+                    demonstrations=rollouts,
+                    demo_batch_size=1024,
+                    gen_replay_buffer_capacity=512,
+                    n_disc_updates_per_round=8,
+                    venv=env,
+                    gen_algo=self.policy,
+                    reward_net=self.reward_net,
+                )
+                self.trainer.train(features.shape[0])
+                self.policy = self.trainer.policy
+
+            if self.save_path is not None:
+                self._save()
 
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:
         action, _ = self.policy.predict(features.to_numpy(), deterministic=True)
