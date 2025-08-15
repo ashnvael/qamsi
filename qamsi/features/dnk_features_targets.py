@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from os import listdir
 from typing import Callable
 from pathlib import Path

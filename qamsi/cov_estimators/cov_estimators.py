@@ -40,6 +40,8 @@ from qamsi.cov_estimators.rl.behavioral_cloning.rf_xiu_estimator import (
     RandomForestXiuCovEstimator,
 )
 
+from qamsi.cov_estimators.rl.behavioral_cloning.ar_estimator import ARCovEstimator
+
 
 class CovEstimators(Enum):
     HISTORICAL = HistoricalCovEstimator
@@ -71,3 +73,5 @@ class CovEstimators(Enum):
     LASSO = LassoCovEstimator
     RIDGE = RidgeCovEstimator
     RF_XIU = RandomForestXiuCovEstimator
+
+    AR = ARCovEstimator
