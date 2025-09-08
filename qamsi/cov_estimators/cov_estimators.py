@@ -34,9 +34,13 @@ from qamsi.cov_estimators.rl.behavioral_cloning.rf_estimator import (
 from qamsi.cov_estimators.rl.behavioral_cloning.xgb_estimator import XGBCovEstimator
 from qamsi.cov_estimators.rl.behavioral_cloning.dl_estimator import DLCovEstimator
 
+from qamsi.cov_estimators.rl.behavioral_cloning.lasso_estimator import LassoCovEstimator
+from qamsi.cov_estimators.rl.behavioral_cloning.ridge_estimator import RidgeCovEstimator
 from qamsi.cov_estimators.rl.behavioral_cloning.rf_xiu_estimator import (
     RandomForestXiuCovEstimator,
 )
+
+from qamsi.cov_estimators.rl.behavioral_cloning.ar_estimator import ARCovEstimator
 
 
 class CovEstimators(Enum):
@@ -66,4 +70,8 @@ class CovEstimators(Enum):
     XGB = XGBCovEstimator
     DEEP_LEARNING = DLCovEstimator
 
+    LASSO = LassoCovEstimator
+    RIDGE = RidgeCovEstimator
     RF_XIU = RandomForestXiuCovEstimator
+
+    AR = ARCovEstimator

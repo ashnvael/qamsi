@@ -52,7 +52,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
         save_path: Path | None = None,
         window_size: int | None = None,
         use_saved_policy: bool = False,
-        refit_policy: bool = False,
+        refit_freq: str | None = None,
         random_seed: int = 12,
     ) -> None:
         super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
@@ -63,7 +63,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
 
         self.imitation_trainer_cls = imitation_trainer_cls
         self.policy_builder = policy_builder
-        self.refit_policy = refit_policy
+        self.refit_freq = refit_freq
 
         trading_config.trading_lag_days = 0
 
@@ -77,6 +77,7 @@ class IRLCovEstimator(BaseRLCovEstimator):
         )
 
         self._has_saved_policy = False
+        self._last_fit_date = None
 
     def collect_rollouts(
         self, env: DummyVecEnv, optimal_env: DummyVecEnv, optimal_actions: pd.Series
@@ -94,10 +95,20 @@ class IRLCovEstimator(BaseRLCovEstimator):
             verbose=True,
         )
 
+    def get_refit_decision(self, current_date: pd.Timestamp) -> bool:
+        if self.refit_freq is None:
+            return False
+        elif self._last_fit_date is None:
+            return True
+        else:
+            return self._last_fit_date + pd.Timedelta(self.refit_freq) >= current_date
+
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
     ) -> None:
-        if self.refit_policy or not self._fitted:
+        refit_policy = self.get_refit_decision(features.index[-1])
+
+        if refit_policy or not self._fitted:
             n_envs = 1
             env = DummyVecEnv(
                 [
