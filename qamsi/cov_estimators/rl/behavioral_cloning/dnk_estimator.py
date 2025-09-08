@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import pandas as pd
-
+import pandas as pd
 from sklearn.linear_model import ElasticNetCV
 from sklearn.model_selection import TimeSeriesSplit
 
@@ -17,6 +13,8 @@ class DNKCovEstimator(BaseRLCovEstimator):
 
         self.last_pred = None
         self.encountered_nan = False
+
+        self.selected_features = None
 
     def _fit_shrinkage(
         self, features: pd.DataFrame, shrinkage_target: pd.Series
@@ -34,6 +32,11 @@ class DNKCovEstimator(BaseRLCovEstimator):
             )
             self.enet.fit(X=features, y=shrinkage_target)
             self.encountered_nan = False
+
+            if self.selected_features is None:
+                self.selected_features = pd.DataFrame(index=[features.index[-1]], columns=features.columns)
+
+            self.selected_features.loc[features.index[-1], features.columns] = self.enet.coef_ != 0.0
 
     def _predict_shrinkage(self, features: pd.DataFrame) -> float:
         if not self.encountered_nan:
