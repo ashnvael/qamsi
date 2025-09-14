@@ -11,8 +11,15 @@ from qamsi.cov_estimators.rl.base_rl_estimator import BaseRLCovEstimator
 
 
 class OLSCovEstimator(BaseRLCovEstimator):
-    def __init__(self, shrinkage_type: str, window_size: int | None = None) -> None:
+    def __init__(
+        self,
+        shrinkage_type: str,
+        window_size: int | None = None,
+        lag_target: int | None = None,
+    ) -> None:
         super().__init__(shrinkage_type=shrinkage_type, window_size=window_size)
+
+        self.lag_target = lag_target
 
         self.last_pred = None
         self.encountered_nan = False
@@ -27,6 +34,11 @@ class OLSCovEstimator(BaseRLCovEstimator):
             )
         else:
             self.lr = LinearRegression()
+
+            if self.lag_target is not None:
+                shrinkage_target = shrinkage_target.iloc[self.lag_target :]
+                features = features.iloc[: -self.lag_target]
+
             self.lr.fit(X=features, y=shrinkage_target)
             self.encountered_nan = False
 
